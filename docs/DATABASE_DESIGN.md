@@ -296,7 +296,12 @@ npm run db:generate               # after editing lib/db/schema
 npm run db:check                  # migration consistency
 npm run db:studio                 # browse the database
 npm run db:set-role -- you@example.com admin   # bootstrap the first admin (account must exist)
+npm run db:status                 # read-only: connection, tables, migrations, row counts
 ```
+
+No local computer? GitHub → Actions → **Database (Neon)** runs `status`,
+`migrate-and-seed`, `migrate` or `set-role` with the repository secrets `DATABASE_URL` and
+`DATABASE_URL_UNPOOLED` (see `AUTHENTICATION.md`).
 
 The seed and migrate scripts refuse to run when `NODE_ENV` or `VERCEL_ENV` is
 `production`; `db:migrate --allow-production` is reserved for the release pipeline.

@@ -15,6 +15,7 @@
     "db:seed:reset": "tsx scripts/db/seed.ts --reset",
     "db:studio": "drizzle-kit studio",
     "db:verify": "tsx scripts/db/verify.ts",
+    "db:status": "tsx scripts/db/status.ts",
     "db:set-role": "tsx --conditions=react-server scripts/db/set-role.ts",
     "db:test:concurrency": "bash scripts/db/concurrency-test.sh"
   },

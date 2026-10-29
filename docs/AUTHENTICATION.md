@@ -51,6 +51,27 @@ Sign-in and sign-up URLs (`/login`, `/sign-up`, then `/dashboard`) are set in co
    first sign-in. Name and email changes, and deletions made in Clerk, sync only through
    it.
 
+### Without a computer (GitHub + Vercel only)
+
+The workflow `.github/workflows/database.yml` runs the database scripts on GitHub's
+servers.
+
+1. In the Neon console, click **Connect** and copy two connection strings: one with
+   connection pooling on (`DATABASE_URL`) and one with it off (`DATABASE_URL_UNPOOLED`).
+2. In GitHub → repository **Settings → Secrets and variables → Actions**, add both as
+   repository secrets with those names.
+3. In GitHub → **Actions → Database (Neon) → Run workflow**, choose `migrate-and-seed`.
+   The last step's log shows `Tables: 27`, `views: 3`, `Migrations applied: 5` and the
+   data counts.
+4. In Vercel → project **Settings → Environment Variables**, add the same two values,
+   plus `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from Clerk. Then
+   **Redeploy**: the publishable key is built into the page, so a redeploy is required.
+5. Sign up on the deployed site, then run the workflow again with `set-role`, your email
+   and `admin`.
+
+Clerk development keys (`pk_test_…`) work on `*.vercel.app` domains. A Clerk production
+instance needs a domain you own.
+
 ### Without credentials
 
 The app fails closed. There's no bypass and no fallback user.
