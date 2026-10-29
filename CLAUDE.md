@@ -17,8 +17,9 @@ Read both before starting work, and update the status file at the end of every p
 - Clerk authentication
 - Vercel deployment
 
-Installed so far: Next.js, React, Tailwind, ESLint, TypeScript and the shadcn/ui
-dependencies. Check `package.json` before assuming any other library exists.
+Installed so far: Next.js, React, Tailwind, ESLint, TypeScript, shadcn/ui dependencies,
+Drizzle ORM + drizzle-kit, `@neondatabase/serverless`, and (dev) tsx and PGlite. Check
+`package.json` before assuming any other library exists.
 Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and is marked
 `// PLACEHOLDER`. Browser-only drafts use `lib/preview-store.ts`; never present them as bookings.
 
@@ -28,6 +29,9 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
 - `npm run lint`: ESLint (flat config, `eslint.config.mjs`)
 - `npx tsc --noEmit`: type check
 - `npm run build`: production build (must pass before a phase is "done")
+- `npm run db:verify`: offline DB check (migrations, seed, integrity checks, `sql/queries.sql`)
+- `npm run db:generate` after editing `lib/db/schema/`; `db:migrate` / `db:seed` need `.env.local`
+- Database design: `docs/DATABASE_DESIGN.md`, diagrams in `docs/ERD.md`
 
 ## Next.js 16 specifics
 
@@ -57,10 +61,11 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
   resource/staff availability under a row lock or conditional update. Use the
   Neon WebSocket driver (`drizzle-orm/neon-serverless`) for transactions,
   because `neon-http` has no interactive transactions.
-- Use normalized relational tables: guests, guest_preferences, experiences,
-  experience_slots, bookings, resources, staff, payments, reviews, plus join
-  tables where needed. Use FKs, unique/check constraints and indexes.
-  Store money as integer minor units with a currency code and times as `timestamptz` (UTC).
+- Schema lives in `lib/db/schema/` (normalized, 26 tables). Integrity rules Drizzle
+  can't express are triggers in `drizzle/0001_integrity.sql`; add new ones with
+  `drizzle-kit generate --custom`. Never edit a migration that has been applied.
+- Money: `numeric(10,2)`/`numeric(12,2)` plus currency code in the DB, integer minor
+  units in the app; convert only with `lib/money.ts`. Times are `timestamptz` (UTC).
 - Stay Vercel-compatible: no long-lived servers, local file writes or custom
   Node servers. Keep code Node runtime unless edge is required.
 
