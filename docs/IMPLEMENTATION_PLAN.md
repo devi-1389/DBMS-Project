@@ -54,6 +54,11 @@ Components (shadcn primitives in `components/ui/`; feature components alongside)
 
 ## 2. Database schema
 
+> **Superseded by the implemented design:** see [`DATABASE_DESIGN.md`](./DATABASE_DESIGN.md)
+> and [`ERD.md`](./ERD.md) (26 tables). Notable changes from this draft: money is
+> `numeric(10,2)` in the database (minor units only in the app), categories are a table,
+> and staff, resources, suppliers, itineraries and blackouts are fully modelled.
+
 Conventions: `uuid` primary keys, `created_at`/`updated_at timestamptz`, money in
 `*_minor integer` plus `currency char(3)`, all times in UTC, displayed in the resort's timezone.
 

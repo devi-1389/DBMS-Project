@@ -1,6 +1,6 @@
 # LUXE-ECO Implementation Status
 
-Last updated: 2026-10-29
+Last updated: 2026-10-29 (Phase 4: database design)
 
 Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not started ·
 `[mock]` UI exists but uses placeholder data (not a working feature)
@@ -9,8 +9,14 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
 
 - Frontend pages exist for `/`, `/experiences`, `/experiences/[slug]`, `/preferences`,
   `/itinerary`, `/dashboard`, `/my-bookings`, `/admin` and `/login`. All use sample data.
-- **No backend features work yet.** There's no auth, database or booking. Nothing a visitor
-  does reaches a server.
+- **No backend features work yet.** There's no auth or booking, and no page reads the
+  database yet. Nothing a visitor does reaches a server.
+- **Database design is done (Phase 4)**, verified offline and on local PostgreSQL, but not
+  yet applied to a Neon database (no credentials in this environment):
+  - Drizzle schema: 26 normalized tables and 2 views (`lib/db/schema/`).
+  - Migrations: `drizzle/0000_schema.sql` plus `0001_integrity.sql` (triggers and views).
+  - Development seed reusing the catalogue (`scripts/db/`), 16 queries in `sql/queries.sql`.
+  - See `docs/DATABASE_DESIGN.md` and `docs/ERD.md`.
 - What does work, entirely in the browser:
   - Catalogue filtering and sorting (URL-synced).
   - Rule-based matching (`lib/matching/score.ts`, a pure function ready for server reuse).
@@ -24,8 +30,11 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
   bookings, with async accessors shaped like the future DAL.
 - Installed: `next@16.4.3`, `react@19.3.0`, Tailwind CSS v4, ESLint 9, TypeScript 5,
   shadcn/ui dependencies (`radix-ui`, `class-variance-authority`, `clsx`, `tailwind-merge`,
-  `lucide-react`, `tw-animate-css`). No new dependencies in Phase 2.
-- Not installed yet: Clerk, Drizzle ORM, Neon driver, Zod, test framework.
+  `lucide-react`, `tw-animate-css`). Phase 4 added `drizzle-orm`, `@neondatabase/serverless`
+  and (dev) `drizzle-kit`, `tsx`, `@electric-sql/pglite`; `engines.node` is `>=22`.
+- Not installed yet: Clerk, Zod, test framework (Vitest).
+- `npm audit`: production dependencies clean. 4 moderate advisories are in an old `esbuild`
+  bundled inside dev-only `drizzle-kit` (its dev-server issue; drizzle-kit doesn't use it).
 - shadcn/ui registry (ui.shadcn.com) and photo hosts are blocked by this environment's
   network policy. `components/ui/*` was written by hand to the shadcn new-york pattern,
   and all imagery is generated placeholder illustration (`public/images/placeholder/`).
@@ -53,7 +62,7 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
       sheet) and footer. Guest and admin layouts mark where Phase 3 auth checks go.
 - [x] Replace starter page and unused `public/*.svg` assets
 - [ ] Replace placeholder illustrations with licensed resort photography
-- [ ] Connect Vercel preview deployments (needs a git remote)
+- [ ] Connect Vercel preview deployments (git remote now exists: github.com/devi-1389/DBMS-Project)
 
 ## Phase 2: Frontend pages (placeholder data, clearly labelled)
 
@@ -104,15 +113,41 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
 
 ## Phase 4: Database (Neon + Drizzle)
 
-- [ ] Install Drizzle, drizzle-kit, Neon driver; `server-only` `lib/db/` client
-- [ ] Set up Vitest
-- [ ] Schema: guests, guest_preferences, experiences, experience_slots, bookings,
-      resources, staff, payments, reviews, plus join tables
-      (e.g. slot_resources, slot_staff_assignments)
-- [ ] Constraints: FKs, unique, check (capacity ≥ 0, rating 1–5), indexes
-- [ ] Migrations generated and applied to a Neon dev branch
-- [ ] Seed script (dev data only)
-- [ ] Link Clerk user ID ↔ guests/staff rows
+- [x] Drizzle ORM, drizzle-kit and the Neon WebSocket driver (`neon-serverless`, chosen for
+      interactive transactions). Lazy `server-only` client in `lib/db/index.ts` (not used
+      by any page yet).
+- [x] Schema (26 tables, 2 views):
+      - Guests and Clerk identity IDs.
+      - Interests and preferences.
+      - Categories, experiences and slots.
+      - Bookings and status history.
+      - Staff and assignments.
+      - Resources, requirements, allocations and maintenance.
+      - Suppliers, payment attempts and reviews.
+      - Itineraries and blackout periods.
+- [x] Constraints:
+      - Primary keys, foreign keys with explicit RESTRICT/CASCADE/SET NULL rules.
+      - Named unique and check constraints; partial unique indexes; GiST range index.
+      - `numeric(10,2)`/`(12,2)` money; generated `during` and `total_amount` columns.
+- [x] Integrity triggers:
+      - Race-free seat accounting and allowed status transitions.
+      - Automatic status history.
+      - Staff overlap check and resource capacity incl. maintenance.
+      - Blackouts, slot change protection, reviews only after completion.
+      - Custom `LX…` error codes.
+- [x] Migrations generated (`drizzle/`); `drizzle-kit check` clean; schema and snapshots in sync.
+- [~] Migrations applied to a **Neon** dev branch: not done here (no credentials). Applied
+      to local PostgreSQL 16 and PGlite (PostgreSQL 18).
+- [x] Development seed (`npm run db:seed`, `db:seed:reset`). It reuses the catalogue,
+      categories and interests; seed-only data is in `scripts/db/seed-data.ts`. Guarded
+      against production.
+- [~] Seed run against **Neon**: not done here (no credentials). Ran on PostgreSQL 16 and PGlite.
+- [x] `docs/ERD.md` (Mermaid; all 7 diagrams render), `docs/DATABASE_DESIGN.md`,
+      `sql/queries.sql` (16 queries)
+- [x] Checks: `npm run db:verify` (offline, PGlite) and `npm run db:test:concurrency`
+      (parallel psql sessions)
+- [ ] Set up Vitest (unit tests for `lib/money.ts`, matching, filters)
+- [ ] Link Clerk user ID ↔ users rows (table `auth_identities` is ready; webhook in Phase 3)
 
 ## Phase 5: Backend reads & matching
 
@@ -153,7 +188,8 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
 
 See "Missing decisions" in `docs/IMPLEMENTATION_PLAN.md` (payments, single vs
 multiple properties, stays, policies, timezone/currency, party details, images, email).
-Most urgent: **git remote**. The local repo has none, so work isn't backed up outside this environment.
+The git remote is set up (`origin`, github.com/devi-1389/DBMS-Project). Next most useful step:
+a Neon development branch, so `db:migrate` and `db:seed` can run against Neon.
 
 ## Verification log
 
@@ -170,6 +206,12 @@ Most urgent: **git remote**. The local repo has none, so work isn't backed up ou
 | 2026-10-29 | 2     | `npx tsc --noEmit`        | Pass   |
 | 2026-10-29 | 2     | `npm run build`           | Pass (24 prerendered pages, incl. 12 experience details) |
 | 2026-10-29 | 2     | Playwright browser run (ad hoc script, not in repo) | 67/67 pass: every page and interaction above, 390px no overflow on 9 routes, reduced motion, no console errors |
+| 2026-10-29 | 4     | `npm run lint` / `npx tsc --noEmit` / `npm run build` | Pass (frontend unchanged: 24 prerendered pages) |
+| 2026-10-29 | 4     | `npm run db:check` and `drizzle-kit generate` | Pass ("Everything's fine"; "No schema changes") |
+| 2026-10-29 | 4     | `npm run db:verify` (PGlite, PostgreSQL 18.6) | 67/67 pass: migrations, seed, 47 integrity checks, 4 money checks, 16 queries |
+| 2026-10-29 | 4     | Same seed, checks and queries on local PostgreSQL 16.15 (`pg` driver, scratch runner) | 47/47 checks, 16/16 queries |
+| 2026-10-29 | 4     | `npm run db:test:concurrency` on PostgreSQL 16 | Pass: 8 attempts on 3 seats → 3 booked, 5 `LXB01`; 30 on 7 → 7 booked, 23 `LXB01` |
+| 2026-10-29 | 4     | `db:migrate` / `db:seed` against Neon | Not run: no Neon credentials in this environment |
 
 Known Next 16 behaviour: the previous route stays mounted but hidden (`display: none`)
 for instant back navigation, so DOM queries in tests must ignore hidden elements.
