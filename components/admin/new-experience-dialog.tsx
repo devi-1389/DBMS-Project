@@ -116,7 +116,7 @@ export function NewExperienceDialog() {
               <Input {...field} type="number" inputMode="numeric" min={1} max={40} value={values.capacity} onChange={set("capacity")} />
             )}
           </FormField>
-          <FormField id="new-exp-price" label="Price per guest (USD)" hint="Use 0 for complimentary." error={errors.price}>
+          <FormField id="new-exp-price" label="Price per guest (₹)" hint="Use 0 for complimentary." error={errors.price}>
             {(field) => (
               <Input {...field} type="number" inputMode="decimal" min={0} step={5} value={values.price} onChange={set("price")} />
             )}

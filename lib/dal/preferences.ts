@@ -1,8 +1,16 @@
 import "server-only";
 
-import { eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 
-import { guestInterests, guestPreferences, guestPreferredTimes, interests } from "@/lib/db/schema";
+import { isExperienceCategory, type ExperienceCategory } from "@/lib/categories";
+import {
+  experienceCategories,
+  guestInterests,
+  guestPreferences,
+  guestPreferredCategories,
+  guestPreferredTimes,
+  interests,
+} from "@/lib/db/schema";
 import type { Db } from "@/lib/db/types";
 import { isInterestId, type InterestId } from "@/lib/interests";
 import { DEFAULT_INTEREST_WEIGHT } from "@/lib/matching/recommend";
@@ -23,10 +31,17 @@ export async function getPreferences(db: Db, guestId: string): Promise<GuestPref
     .select({ timeOfDay: guestPreferredTimes.timeOfDay })
     .from(guestPreferredTimes)
     .where(eq(guestPreferredTimes.guestId, guestId));
+  const categoryRows = await db
+    .select({ slug: experienceCategories.slug })
+    .from(guestPreferredCategories)
+    .innerJoin(experienceCategories, eq(experienceCategories.id, guestPreferredCategories.categoryId))
+    .where(eq(guestPreferredCategories.guestId, guestId))
+    .orderBy(asc(experienceCategories.sortOrder));
 
   const known = interestRows.filter((item): item is { slug: InterestId; weight: number } => isInterestId(item.slug));
   return {
     interests: known.map((item) => item.slug),
+    categories: categoryRows.map((item) => item.slug).filter((slug): slug is ExperienceCategory => isExperienceCategory(slug)),
     interestWeights: Object.fromEntries(known.map((item) => [item.slug, item.weight])),
     pace: row.maxDifficulty,
     budgetMaxMinor: row.budgetPerGuest === null ? null : decimalToMinor(row.budgetPerGuest),
@@ -66,6 +81,17 @@ export async function savePreferences(db: Db, guestId: string, input: Preference
           weight: isInterestId(row.slug) ? (input.interestWeights[row.slug] ?? DEFAULT_INTEREST_WEIGHT) : DEFAULT_INTEREST_WEIGHT,
         })),
       );
+    }
+
+    const categoryRows = input.categories.length
+      ? await tx
+          .select({ id: experienceCategories.id })
+          .from(experienceCategories)
+          .where(inArray(experienceCategories.slug, input.categories))
+      : [];
+    await tx.delete(guestPreferredCategories).where(eq(guestPreferredCategories.guestId, guestId));
+    if (categoryRows.length) {
+      await tx.insert(guestPreferredCategories).values(categoryRows.map((row) => ({ guestId, categoryId: row.id })));
     }
 
     await tx.delete(guestPreferredTimes).where(eq(guestPreferredTimes.guestId, guestId));

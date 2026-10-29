@@ -1,9 +1,9 @@
 // PLACEHOLDER: the one sample-data module for the frontend phase. Nothing here is real
-// inventory, availability or bookings. Titles, prices (USD), schedules, seat counts and
+// inventory, availability or bookings. Titles, prices (INR), schedules, seat counts and
 // guest names are invented. Images are generated illustrations.
 // Replace these accessors with `server-only` DAL functions in Phase 5. Keep the same
 // names and return types so pages only change their import.
-import { addDays } from "@/lib/format";
+import { addDays, resortTime } from "@/lib/format";
 import type { BookingStatus, BookingSummary } from "@/lib/types/booking";
 import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
 
@@ -31,8 +31,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "easy",
     maxGroupSize: 6,
     minAge: 12,
-    priceFromMinor: 42000,
-    currency: "USD",
+    priceFromMinor: 550000,
+    currency: "INR",
     image: img("canopy-sunset-dining", "Illustration of a glowing glass pavilion above a lake at sunset"),
     featured: true,
   },
@@ -52,8 +52,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "easy",
     maxGroupSize: 8,
     minAge: 8,
-    priceFromMinor: 26000,
-    currency: "USD",
+    priceFromMinor: 250000,
+    currency: "INR",
     image: img("starlit-observatory", "Illustration of a lit pavilion in a forest under a starry night sky"),
     featured: false,
   },
@@ -73,8 +73,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "moderate",
     maxGroupSize: 10,
     minAge: 8,
-    priceFromMinor: 9500,
-    currency: "USD",
+    priceFromMinor: 120000,
+    currency: "INR",
     image: img("old-growth-forest-trail", "Illustration of misty layered pine forest ridges in the morning"),
     featured: true,
   },
@@ -94,8 +94,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "easy",
     maxGroupSize: 8,
     minAge: 10,
-    priceFromMinor: 12000,
-    currency: "USD",
+    priceFromMinor: 180000,
+    currency: "INR",
     image: img("river-wildlife-canoe", "Illustration of two people paddling a canoe across a calm lake at dawn"),
     featured: false,
   },
@@ -115,8 +115,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "challenging",
     maxGroupSize: 8,
     minAge: 14,
-    priceFromMinor: 18000,
-    currency: "USD",
+    priceFromMinor: 350000,
+    currency: "INR",
     image: img("ridge-line-summit-trek", "Illustration of sharp mountain peaks above a pine forest"),
     featured: true,
   },
@@ -136,8 +136,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "moderate",
     maxGroupSize: 10,
     minAge: 12,
-    priceFromMinor: 15000,
-    currency: "USD",
+    priceFromMinor: 280000,
+    currency: "INR",
     image: img("canopy-zipline-circuit", "Illustration of a zipline cable across a mountain valley"),
     featured: false,
   },
@@ -157,8 +157,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "easy",
     maxGroupSize: 12,
     minAge: 12,
-    priceFromMinor: 6500,
-    currency: "USD",
+    priceFromMinor: 90000,
+    currency: "INR",
     image: img("lakeside-sunrise-yoga", "Illustration of stacked stones beside a misty lake"),
     featured: true,
   },
@@ -178,8 +178,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "easy",
     maxGroupSize: 6,
     minAge: 16,
-    priceFromMinor: 19000,
-    currency: "USD",
+    priceFromMinor: 380000,
+    currency: "INR",
     image: img("forest-thermal-ritual", "Illustration of a misty lake at night with smooth stones in the water"),
     featured: false,
   },
@@ -199,8 +199,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "easy",
     maxGroupSize: 12,
     minAge: 6,
-    priceFromMinor: 14000,
-    currency: "USD",
+    priceFromMinor: 220000,
+    currency: "INR",
     image: img("village-harvest-table", "Illustration of terraced hills with lit houses and lanterns at dusk"),
     featured: true,
   },
@@ -220,8 +220,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "easy",
     maxGroupSize: 8,
     minAge: 8,
-    priceFromMinor: 11000,
-    currency: "USD",
+    priceFromMinor: 150000,
+    currency: "INR",
     image: img("artisan-craft-workshop", "Illustration of terraced green hills with small houses"),
     featured: false,
   },
@@ -241,8 +241,8 @@ const experiences: ExperienceSummary[] = [
     difficulty: "moderate",
     maxGroupSize: 15,
     minAge: 6,
-    priceFromMinor: 4500,
-    currency: "USD",
+    priceFromMinor: 50000,
+    currency: "INR",
     image: img("reforestation-morning", "Illustration of sunlight falling through tall trees onto young sprouts"),
     featured: true,
   },
@@ -263,8 +263,136 @@ const experiences: ExperienceSummary[] = [
     maxGroupSize: 12,
     minAge: 8,
     priceFromMinor: 0,
-    currency: "USD",
+    currency: "INR",
     image: img("behind-the-green-scenes", "Illustration of light beams through a tall forest"),
+    featured: false,
+  },
+  // Added to cover the SOLACE / LUXE-ECO brief: spa, kayaking, cycling, a local food
+  // trail, a cultural village tour and a private cabana.
+  {
+    slug: "signature-spa-ritual",
+    title: "Signature Spa Ritual",
+    category: "wellness",
+    summary: "A ninety-minute warm herbal-oil massage and steam in a private garden suite.",
+    description:
+      "Your therapist begins with a short consultation, then a warm herbal-oil massage in the Ayurvedic tradition, an herbal steam and time to rest with tea in a private garden suite.",
+    highlights: ["Consultation with your therapist", "Warm herbal-oil massage and steam", "Private suite for one or two guests"],
+    interests: ["mindfulness"],
+    location: "Garden Spa",
+    meetingPoint: "Garden Spa reception",
+    accessible: true,
+    durationMinutes: 90,
+    difficulty: "easy",
+    maxGroupSize: 2,
+    minAge: 16,
+    priceFromMinor: 450000,
+    currency: "INR",
+    image: img("signature-spa-ritual", "Illustration of a misty lake with a lit spa pavilion and stacked stones"),
+    featured: false,
+  },
+  {
+    slug: "lake-kayak-expedition",
+    title: "Lake Kayak Expedition",
+    category: "adventure",
+    summary: "Paddle single kayaks across open water to the reed-fringed coves of the far shore.",
+    description:
+      "After a safety briefing on the jetty, an instructor leads the group across the lake and into quiet coves, with a stop on a sandbar for fresh fruit and coconut water.",
+    highlights: ["Single sit-on-top kayaks and life jackets", "Safety briefing and certified instructor", "Sandbar stop with fresh fruit"],
+    interests: ["water", "thrills"],
+    location: "Boathouse Jetty",
+    meetingPoint: "Boathouse",
+    accessible: false,
+    durationMinutes: 120,
+    difficulty: "moderate",
+    maxGroupSize: 8,
+    minAge: 12,
+    priceFromMinor: 160000,
+    currency: "INR",
+    image: img("lake-kayak-expedition", "Illustration of paddlers crossing a calm lake under a pale sun"),
+    featured: false,
+  },
+  {
+    slug: "valley-cycle-trail",
+    title: "Valley Cycle Trail",
+    category: "sustainability",
+    summary: "A guided, car-free ride on shared resort bicycles through farms, forest edges and the old river bridge.",
+    description:
+      "Ride the resort's shared bicycles along quiet farm tracks and forest edges, stopping at a spice garden and the old stone bridge. Electric bicycles help on the steeper sections.",
+    highlights: ["Shared resort bicycles and helmets", "Car-free route on farm tracks", "Spice garden stop"],
+    interests: ["forest", "conservation"],
+    location: "Valley tracks",
+    meetingPoint: "Cycle shed, main lodge",
+    accessible: false,
+    durationMinutes: 150,
+    difficulty: "moderate",
+    maxGroupSize: 10,
+    minAge: 12,
+    priceFromMinor: 100000,
+    currency: "INR",
+    image: img("valley-cycle-trail", "Illustration of terraced farm hills at dawn"),
+    featured: false,
+  },
+  {
+    slug: "inlet-food-trail",
+    title: "Inlet Food Trail",
+    category: "local-culture",
+    summary: "Meet the inlet's fishing families, taste the morning catch and cook a fish curry with a home cook.",
+    description:
+      "Walk the fish landing and spice stalls with a local host, then cook and share a fish curry, rice and pickles in a family kitchen by the water.",
+    highlights: ["Fish landing and spice market walk", "Hands-on cooking in a family kitchen", "Lunch of the day's catch"],
+    interests: ["food", "community", "water"],
+    location: "North Inlet village",
+    meetingPoint: "Main lodge, shuttle stop",
+    accessible: true,
+    durationMinutes: 180,
+    difficulty: "easy",
+    maxGroupSize: 10,
+    minAge: 6,
+    priceFromMinor: 180000,
+    currency: "INR",
+    image: img("inlet-food-trail", "Illustration of a fishing boat on golden water at dusk"),
+    featured: false,
+  },
+  {
+    slug: "heritage-village-walk",
+    title: "Heritage Village Walk",
+    category: "local-culture",
+    summary: "Walk the old village lanes with a local storyteller, from the temple tank to the weavers' street.",
+    description:
+      "A village storyteller and a resort host lead you past tiled-roof houses, a centuries-old temple tank and the weavers' street, ending with filter coffee in a courtyard home.",
+    highlights: ["Village storyteller and host", "Weavers' street and temple tank", "Filter coffee in a courtyard home"],
+    interests: ["community", "craft"],
+    location: "Old village",
+    meetingPoint: "Village gate",
+    accessible: false,
+    durationMinutes: 150,
+    difficulty: "easy",
+    maxGroupSize: 12,
+    minAge: 0,
+    priceFromMinor: 120000,
+    currency: "INR",
+    image: img("heritage-village-walk", "Illustration of village houses on terraced hills with strung lanterns"),
+    featured: false,
+  },
+  {
+    slug: "lakeside-cabana",
+    title: "Private Lakeside Cabana",
+    category: "luxury",
+    summary: "A half-day private cabana on the shore with daybeds, a butler and a picnic of small plates.",
+    description:
+      "Your cabana has shaded daybeds and a plunge deck on the quiet south shore. Swim, read and doze while your butler brings chilled drinks and a picnic of small plates from the kitchen.",
+    highlights: ["Private shaded cabana with daybeds", "Dedicated butler", "Picnic of small plates and drinks"],
+    interests: ["water", "food"],
+    location: "South Shore",
+    meetingPoint: "Main lodge terrace",
+    accessible: true,
+    durationMinutes: 240,
+    difficulty: "easy",
+    maxGroupSize: 4,
+    minAge: 0,
+    priceFromMinor: 400000,
+    currency: "INR",
+    image: img("lakeside-cabana", "Illustration of a lit cabana pavilion over a calm lake"),
     featured: false,
   },
 ];
@@ -288,6 +416,12 @@ const schedules: Record<string, { days: number[]; times: string[] }> = {
   "artisan-craft-workshop": { days: [0, 2, 4], times: ["10:00"] },
   "reforestation-morning": { days: [3, 6], times: ["08:30"] },
   "behind-the-green-scenes": { days: [1, 5], times: ["11:00"] },
+  "signature-spa-ritual": { days: [0, 1, 2, 3, 4, 5, 6], times: ["10:00", "14:00", "17:00"] },
+  "lake-kayak-expedition": { days: [0, 1, 2, 3, 4, 5, 6], times: ["07:30", "15:30"] },
+  "valley-cycle-trail": { days: [0, 1, 3, 4, 6], times: ["06:45", "16:30"] },
+  "inlet-food-trail": { days: [0, 3, 5], times: ["11:30"] },
+  "heritage-village-walk": { days: [1, 2, 4, 6], times: ["09:00", "16:00"] },
+  "lakeside-cabana": { days: [0, 1, 2, 3, 4, 5, 6], times: ["10:00", "14:30"] },
 };
 
 /** Stable pseudo-random number in [0, 1) so sample seat counts never change between renders. */
@@ -308,7 +442,7 @@ const slots: ExperienceSlot[] = experiences.flatMap((experience) => {
     if (!schedule.days.includes(new Date(`${day}T00:00:00Z`).getUTCDay())) return [];
     return schedule.times.map((time) => {
       const id = `${experience.slug}--${day}--${time.replace(":", "")}`;
-      const startsAt = `${day}T${time}:00.000Z`;
+      const startsAt = resortTime(day, time).toISOString();
       const endsAt = new Date(Date.parse(startsAt) + experience.durationMinutes * 60_000).toISOString();
       const roll = seeded(id);
       const booked = roll > 0.86 ? experience.maxGroupSize : Math.floor(roll * experience.maxGroupSize * 0.95);
@@ -318,6 +452,9 @@ const slots: ExperienceSlot[] = experiences.flatMap((experience) => {
 });
 
 /* ------------------------------------------------------------------ bookings */
+
+/** A resort-local date and time as an ISO instant. */
+const at = (day: string, time: string) => resortTime(day, time).toISOString();
 
 type SampleBookingSeed = {
   reference: string;
@@ -331,16 +468,18 @@ type SampleBookingSeed = {
 };
 
 const bookingSeeds: SampleBookingSeed[] = [
-  { reference: "LX-4KQ7", slug: "lakeside-sunrise-yoga", startsAt: "2026-11-03T07:00:00.000Z", partySize: 2, status: "confirmed", guestName: "Sample guest", ownBooking: true },
-  { reference: "LX-8TB2", slug: "canopy-sunset-dining", startsAt: "2026-11-05T17:30:00.000Z", partySize: 2, status: "confirmed", guestName: "Sample guest", ownBooking: true },
-  { reference: "LX-2MW9", slug: "village-harvest-table", startsAt: "2026-11-07T15:00:00.000Z", partySize: 2, status: "pending", guestName: "Sample guest", ownBooking: true },
-  { reference: "LX-6RJ3", slug: "old-growth-forest-trail", startsAt: "2026-10-12T08:00:00.000Z", partySize: 2, status: "completed", guestName: "Sample guest", ownBooking: true },
-  { reference: "LX-9PD5", slug: "canopy-zipline-circuit", startsAt: "2026-10-14T10:00:00.000Z", partySize: 1, status: "cancelled", guestName: "Sample guest", ownBooking: true },
-  { reference: "LX-3HV8", slug: "ridge-line-summit-trek", startsAt: "2026-11-03T07:00:00.000Z", partySize: 4, status: "confirmed", guestName: "M. Okafor" },
-  { reference: "LX-7CN1", slug: "river-wildlife-canoe", startsAt: "2026-11-04T06:30:00.000Z", partySize: 2, status: "confirmed", guestName: "J. Lindqvist" },
-  { reference: "LX-5GX4", slug: "forest-thermal-ritual", startsAt: "2026-11-06T19:00:00.000Z", partySize: 3, status: "pending", guestName: "A. Moreau" },
-  { reference: "LX-1ZL6", slug: "reforestation-morning", startsAt: "2026-11-07T08:30:00.000Z", partySize: 6, status: "confirmed", guestName: "R. Tanaka" },
-  { reference: "LX-0WE2", slug: "starlit-observatory", startsAt: "2026-11-02T20:30:00.000Z", partySize: 2, status: "cancelled", guestName: "S. Haddad" },
+  { reference: "LX-4KQ7", slug: "lakeside-sunrise-yoga", startsAt: at("2026-11-03", "07:00"), partySize: 2, status: "confirmed", guestName: "Sample guest", ownBooking: true },
+  { reference: "LX-8TB2", slug: "canopy-sunset-dining", startsAt: at("2026-11-05", "17:30"), partySize: 2, status: "confirmed", guestName: "Sample guest", ownBooking: true },
+  { reference: "LX-2MW9", slug: "village-harvest-table", startsAt: at("2026-11-07", "15:00"), partySize: 2, status: "pending", guestName: "Sample guest", ownBooking: true },
+  { reference: "LX-6RJ3", slug: "old-growth-forest-trail", startsAt: at("2026-10-12", "08:00"), partySize: 2, status: "completed", guestName: "Sample guest", ownBooking: true },
+  { reference: "LX-9PD5", slug: "canopy-zipline-circuit", startsAt: at("2026-10-14", "10:00"), partySize: 1, status: "cancelled", guestName: "Sample guest", ownBooking: true },
+  { reference: "LX-3HV8", slug: "ridge-line-summit-trek", startsAt: at("2026-11-03", "07:00"), partySize: 4, status: "confirmed", guestName: "M. Okafor" },
+  { reference: "LX-7CN1", slug: "river-wildlife-canoe", startsAt: at("2026-11-04", "06:30"), partySize: 2, status: "confirmed", guestName: "J. Lindqvist" },
+  { reference: "LX-5GX4", slug: "forest-thermal-ritual", startsAt: at("2026-11-06", "19:00"), partySize: 3, status: "pending", guestName: "A. Moreau" },
+  { reference: "LX-1ZL6", slug: "reforestation-morning", startsAt: at("2026-11-07", "08:30"), partySize: 6, status: "confirmed", guestName: "R. Tanaka" },
+  { reference: "LX-0WE2", slug: "starlit-observatory", startsAt: at("2026-11-02", "20:30"), partySize: 2, status: "cancelled", guestName: "S. Haddad" },
+  { reference: "LX-6SP3", slug: "signature-spa-ritual", startsAt: at("2026-11-06", "14:00"), partySize: 2, status: "confirmed", guestName: "K. Menon" },
+  { reference: "LX-4KY8", slug: "lake-kayak-expedition", startsAt: at("2026-11-09", "07:30"), partySize: 3, status: "confirmed", guestName: "P. Sharma" },
 ];
 
 function toBooking(seed: SampleBookingSeed): BookingSummary {

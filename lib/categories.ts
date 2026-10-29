@@ -14,7 +14,7 @@ export const CATEGORY_LABELS: Record<ExperienceCategory, string> = {
   nature: "Nature",
   adventure: "Adventure",
   wellness: "Wellness",
-  "local-culture": "Local Culture",
+  "local-culture": "Local Experiences",
   sustainability: "Sustainability",
 };
 

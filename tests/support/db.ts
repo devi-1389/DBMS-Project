@@ -8,6 +8,7 @@ import type { Viewer } from "@/lib/auth/types";
 import { findViewerByUserId } from "@/lib/dal/identity";
 import * as schema from "@/lib/db/schema";
 import type { Db } from "@/lib/db/types";
+import { resortTime } from "@/lib/format";
 import { seedDatabase } from "@/scripts/db/seed-database";
 
 export type TestDb = { db: Db; client: PGlite; close: () => Promise<void> };
@@ -35,6 +36,9 @@ export const SEEDED = {
   staff: "mara@example.com",
   guest: "sample.guest@example.com",
 } as const;
+
+/** A resort-local (IST) date and time as an ISO instant, e.g. at("2026-11-03", "07:00"). */
+export const at = (day: string, time: string) => resortTime(day, time).toISOString();
 
 /** Before the seeded season (2–15 Nov 2026), so every seeded session is upcoming. */
 export const BEFORE_SEASON = new Date("2026-10-29T12:00:00.000Z");

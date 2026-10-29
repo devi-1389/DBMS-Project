@@ -8,9 +8,10 @@ import { addItem, createPlan, deletePlan, getPlan, listPlans, removeItem, update
 import { getPreferences, savePreferences } from "@/lib/dal/preferences";
 import { getStaffSchedule } from "@/lib/dal/staff";
 import { bookings, experiences, experienceSlots } from "@/lib/db/schema";
+import { resortDayWindow, toDateKey } from "@/lib/format";
 import { defaultFilters, filterWindow } from "@/lib/matching/filters";
 import { recommendExperiences } from "@/lib/matching/recommend";
-import { BEFORE_SEASON, createTestDb, SEEDED, viewerByEmail, type TestDb } from "@/tests/support/db";
+import { at, BEFORE_SEASON, createTestDb, SEEDED, viewerByEmail, type TestDb } from "@/tests/support/db";
 
 let t: TestDb;
 beforeAll(async () => {
@@ -39,7 +40,7 @@ describe("preferences", () => {
       interests: expect.arrayContaining(["wildlife", "water", "mindfulness"]),
       interestWeights: { wildlife: 5, water: 4, mindfulness: 3 },
       pace: "easy",
-      budgetMaxMinor: 15_000,
+      budgetMaxMinor: 300_000,
       groupSize: 2,
       timesOfDay: ["morning"],
     });
@@ -50,6 +51,7 @@ describe("preferences", () => {
     expect(await getPreferences(t.db, userId)).toBeNull();
     const saved = await savePreferences(t.db, userId, {
       interests: ["mountains", "thrills"],
+      categories: ["adventure", "nature"],
       interestWeights: { thrills: 5 },
       pace: "challenging",
       budgetMaxMinor: null,
@@ -58,11 +60,16 @@ describe("preferences", () => {
       needsAccessibility: false,
       notes: "Training for a marathon",
     });
-    expect(saved).toMatchObject({ interestWeights: { mountains: 3, thrills: 5 }, budgetMaxMinor: null, groupSize: 4 });
+    expect(saved).toMatchObject({
+      interestWeights: { mountains: 3, thrills: 5 },
+      categories: ["nature", "adventure"],
+      budgetMaxMinor: null,
+      groupSize: 4,
+    });
 
-    await savePreferences(t.db, userId, { ...saved, interests: ["food"], interestWeights: {}, timesOfDay: [] });
+    await savePreferences(t.db, userId, { ...saved, interests: ["food"], categories: [], interestWeights: {}, timesOfDay: [] });
     const reloaded = await getPreferences(t.db, userId);
-    expect(reloaded).toMatchObject({ interests: ["food"], interestWeights: { food: 3 }, timesOfDay: [] });
+    expect(reloaded).toMatchObject({ interests: ["food"], categories: [], interestWeights: { food: 3 }, timesOfDay: [] });
   });
 });
 
@@ -74,7 +81,7 @@ describe("itinerary plans", () => {
 
     const intruder = await otherGuest();
     expect(await getPlan(t.db, intruder.userId, plan.id)).toBeNull();
-    expect(await updatePlan(t.db, intruder.userId, plan.id, { name: "Mine now", arrival: null, departure: null })).toMatchObject({
+    expect(await updatePlan(t.db, intruder.userId, plan.id, { name: "Mine now", arrival: null, departure: null, activityBudgetMinor: null })).toMatchObject({
       ok: false,
       code: "plan-not-found",
     });
@@ -93,9 +100,9 @@ describe("itinerary plans", () => {
 
   it("adds sessions without touching seats, and keeps plans separate from bookings", async () => {
     const { userId } = await otherGuest();
-    const created = await createPlan(t.db, userId, { name: "Long weekend", arrival: "2026-11-06", departure: "2026-11-09" });
+    const created = await createPlan(t.db, userId, { name: "Long weekend", arrival: "2026-11-06", departure: "2026-11-09", activityBudgetMinor: null });
     if (!created.ok) throw new Error(created.message);
-    const id = await slotId("reforestation-morning", "2026-11-07T08:30:00.000Z");
+    const id = await slotId("reforestation-morning", at("2026-11-07", "08:30"));
     const before = await seatsBooked(id);
     const bookingsBefore = await t.db.select({ id: bookings.id }).from(bookings).where(eq(bookings.guestId, userId));
 
@@ -114,10 +121,10 @@ describe("itinerary plans", () => {
 
   it("explains why a session can't be planned", async () => {
     const { userId } = await otherGuest();
-    const created = await createPlan(t.db, userId, { name: "Checks", arrival: "2026-11-02", departure: "2026-11-04" });
+    const created = await createPlan(t.db, userId, { name: "Checks", arrival: "2026-11-02", departure: "2026-11-04", activityBudgetMinor: null });
     if (!created.ok) throw new Error(created.message);
     const planId = created.value.planId;
-    const yoga = await slotId("lakeside-sunrise-yoga", "2026-11-03T07:00:00.000Z");
+    const yoga = await slotId("lakeside-sunrise-yoga", at("2026-11-03", "07:00"));
 
     const [cancelled] = await t.db
       .select({ id: experienceSlots.id })
@@ -129,7 +136,7 @@ describe("itinerary plans", () => {
       code: "slot-unavailable",
       message: expect.stringMatching(/cancelled: /),
     });
-    expect(await addItem(t.db, userId, { planId, slotId: yoga, partySize: 1 }, new Date("2026-11-03T07:00:00.000Z"))).toMatchObject({
+    expect(await addItem(t.db, userId, { planId, slotId: yoga, partySize: 1 }, new Date(at("2026-11-03", "07:00")))).toMatchObject({
       ok: false,
       code: "slot-in-past",
     });
@@ -138,7 +145,7 @@ describe("itinerary plans", () => {
       code: "party-too-large",
       field: "partySize",
     });
-    const late = await slotId("lakeside-sunrise-yoga", "2026-11-10T07:00:00.000Z");
+    const late = await slotId("lakeside-sunrise-yoga", at("2026-11-10", "07:00"));
     expect(await addItem(t.db, userId, { planId, slotId: late, partySize: 1 }, BEFORE_SEASON)).toMatchObject({
       ok: false,
       code: "outside-stay",
@@ -151,7 +158,7 @@ describe("itinerary plans", () => {
 
   it("refuses more guests than seats left, without holding any", async () => {
     const { userId } = await otherGuest();
-    const id = await slotId("canopy-zipline-circuit", "2026-11-04T10:00:00.000Z");
+    const id = await slotId("canopy-zipline-circuit", at("2026-11-04", "10:00"));
     const [slot] = await t.db
       .select({ capacity: experienceSlots.capacity, seats: experienceSlots.seatsBooked, max: experiences.maxGroupSize })
       .from(experienceSlots)
@@ -166,11 +173,11 @@ describe("itinerary plans", () => {
 
   it("warns about overlaps but still saves the plan item", async () => {
     const { userId } = await otherGuest();
-    const created = await createPlan(t.db, userId, { name: "Overlap", arrival: null, departure: null });
+    const created = await createPlan(t.db, userId, { name: "Overlap", arrival: null, departure: null, activityBudgetMinor: null });
     if (!created.ok) throw new Error(created.message);
     const planId = created.value.planId;
-    const ridge = await slotId("ridge-line-summit-trek", "2026-11-03T07:00:00.000Z");
-    const yoga = await slotId("lakeside-sunrise-yoga", "2026-11-03T07:00:00.000Z");
+    const ridge = await slotId("ridge-line-summit-trek", at("2026-11-03", "07:00"));
+    const yoga = await slotId("lakeside-sunrise-yoga", at("2026-11-03", "07:00"));
     await addItem(t.db, userId, { planId, slotId: ridge, partySize: 1 }, BEFORE_SEASON);
     const second = await addItem(t.db, userId, { planId, slotId: yoga, partySize: 1 }, BEFORE_SEASON);
     expect(second.ok && second.message).toMatch(/overlaps with Ridge/i);
@@ -201,14 +208,14 @@ describe("booking ownership", () => {
 });
 
 describe("staff schedule", () => {
-  const window = { from: new Date("2026-11-01T00:00:00Z"), to: new Date("2026-11-16T00:00:00Z") };
+  const window = resortDayWindow("2026-11-01", "2026-11-15");
 
   it("lists only the staff member's own assignments", async () => {
     const staff = await viewerByEmail(t.db, SEEDED.staff);
     const sessions = await getStaffSchedule(t.db, staff, window);
     expect(sessions.length).toBeGreaterThan(0);
     expect(new Set(sessions.map((session) => session.staffName))).toEqual(new Set(["Mara Ellis"]));
-    const canoe = sessions.find((session) => session.startsAt === "2026-11-04T06:30:00.000Z");
+    const canoe = sessions.find((session) => session.startsAt === at("2026-11-04", "06:30"));
     expect(canoe?.manifest).toEqual([{ reference: "LX-7CN1", guest: "J. L.", partySize: 2, status: "confirmed" }]);
   });
 
@@ -226,10 +233,10 @@ describe("recommendations from database records", () => {
     const preferences = (await getPreferences(t.db, owner.userId))!;
     const plan = await getPlan(t.db, owner.userId, (await listPlans(t.db, owner.userId))[0].id);
     const filters = defaultFilters(preferences, plan, BEFORE_SEASON);
-    expect(filters).toMatchObject({ from: "2026-11-02", to: "2026-11-05", partySize: 2, maxPricePerGuestMinor: 15_000 });
+    expect(filters).toMatchObject({ from: "2026-11-02", to: "2026-11-05", partySize: 2, maxPricePerGuestMinor: 300_000 });
 
     const catalogue = await listCatalogue(t.db, filterWindow(filters));
-    expect(catalogue.slots.every((slot) => slot.startsAt >= "2026-11-02" && slot.startsAt < "2026-11-06")).toBe(true);
+    expect(catalogue.slots.every((slot) => toDateKey(slot.startsAt) >= "2026-11-02" && toDateKey(slot.startsAt) <= "2026-11-05")).toBe(true);
 
     const { recommendations, excluded } = recommendExperiences({
       ...catalogue,
@@ -241,7 +248,7 @@ describe("recommendations from database records", () => {
     expect(recommendations.length).toBeGreaterThan(0);
     for (const match of recommendations) {
       expect(match.experience.difficulty).toBe("easy");
-      expect(match.experience.priceFromMinor).toBeLessThanOrEqual(15_000);
+      expect(match.experience.priceFromMinor).toBeLessThanOrEqual(300_000);
       expect(match.score).toBe(match.factors.reduce((sum, factor) => sum + factor.points, 0));
       // Sessions already in the plan aren't suggested again.
       expect(match.sessions.some((slot) => plan!.items.some((item) => item.slotId === slot.id))).toBe(false);

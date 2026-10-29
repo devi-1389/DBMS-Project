@@ -157,9 +157,7 @@ function MobileNav({ pathname, mobileAccount }: { pathname: string | null; mobil
         <SheetHeader className="px-6 pt-6">
           <SheetTitle className="flex items-center gap-2.5 font-display text-2xl tracking-[0.2em] text-ivory-50">
             <LeafMark className="size-8 text-gold-400" />
-            <span>
-              LUXE<span className="text-gold-400">·</span>ECO
-            </span>
+            <span>SOLACE</span>
           </SheetTitle>
           <SheetDescription className="text-ivory-100/70">
             Luxury, nature and adventure, matched to you.

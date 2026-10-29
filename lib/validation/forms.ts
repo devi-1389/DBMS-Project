@@ -39,7 +39,7 @@ export function validateExperienceForm(values: ExperienceFormValues): FieldError
   if (!inRange(values.durationMinutes, 30, 720) || !Number.isInteger(Number(values.durationMinutes))) {
     errors.durationMinutes = "Enter whole minutes between 30 and 720.";
   }
-  if (!inRange(values.price, 0, 5000)) errors.price = "Enter a price from 0 to 5,000.";
+  if (!inRange(values.price, 0, 100000)) errors.price = "Enter a price from ₹0 to ₹1,00,000.";
   if (!inRange(values.capacity, 1, 40) || !Number.isInteger(Number(values.capacity))) {
     errors.capacity = "Enter a whole number from 1 to 40.";
   }

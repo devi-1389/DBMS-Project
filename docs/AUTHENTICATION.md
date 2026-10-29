@@ -1,6 +1,6 @@
 # Authentication and authorization
 
-LUXE-ECO uses [Clerk](https://clerk.com) (`@clerk/nextjs` 7, Core 3) for sign-in and
+The SOLACE website (built on LUXE-ECO) uses [Clerk](https://clerk.com) (`@clerk/nextjs` 7, Core 3) for sign-in and
 PostgreSQL for everything else: accounts, roles, preferences and plans. Clerk proves
 who someone is; the database decides what they may do.
 
@@ -113,8 +113,8 @@ Admins can open all three (`lib/auth/roles.ts`).
 
 | Feature | Tables | Notes |
 |---|---|---|
-| Preferences | `guest_preferences`, `guest_interests` (weight 1–5), `guest_preferred_times` | Saved in one transaction by `savePreferencesAction` |
-| Itinerary plans | `itinerary_plans`, `itinerary_items` | Up to 10 plans × 40 items; stay of at most 21 nights |
+| Preferences | `guest_preferences`, `guest_interests` (weight 1–5), `guest_preferred_times`, `guest_preferred_categories` | Saved in one transaction by `savePreferencesAction` |
+| Itinerary plans | `itinerary_plans` (optional activity budget in ₹), `itinerary_items` | Up to 10 plans × 40 items; stay of at most 21 nights |
 | Bookings | `bookings` and history | Read-only for now; creating bookings is Phase 6 |
 
 **Plans are not bookings.** Adding a session to a plan never changes `seats_booked`, and
@@ -125,13 +125,20 @@ honest feedback ("Plans don't hold seats").
 from the database.
 
 - Hard filters, each counted with a stated reason: step-free access, pace, party size,
-  budget cap, and a fitting session. A fitting session means within the dates, with
-  enough seats, at the chosen times of day, not already planned, and not overlapping the
-  plan.
+  budget cap, sessions that can't run, and a fitting session.
+  - "Can't run" means no guide assigned, or a venue, boat or vehicle not held, from the
+    `slot_readiness` view.
+  - A fitting session is within the dates, has enough seats and shared equipment, is at
+    the chosen times of day, isn't already planned and doesn't overlap the plan.
 - The score is a sum of named factors, all shown to the guest: shared interests
-  (weighted), pace, budget, time of day and choice of sessions.
-- "Suggested days" picks non-overlapping sessions, at most two a day. Nothing is saved
-  until the guest adds one.
+  (weighted), favourite categories, pace, budget, time of day and choice of sessions.
+  Each match also says who leads it and which resources are confirmed.
+- "Suggested days" (`lib/dal/planner.ts`) builds the stay day by day:
+  - Matches of at least 50% only, at most two a day, spread across the days.
+  - The guest's preferred times first, never overlapping.
+  - Within what's left of the plan's activity budget.
+  - Nothing is saved until the guest adds a session. Adding re-checks the guide,
+    resources and shared equipment on the server.
 
 ## Tests
 

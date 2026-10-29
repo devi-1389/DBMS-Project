@@ -33,8 +33,8 @@ export function SiteFooter() {
         <div className="max-w-sm sm:col-span-3 lg:col-span-1">
           <Logo />
           <p className="mt-6 leading-relaxed text-ivory-100/70">
-            An integrated luxury, nature and adventure resort, where every experience is matched to
-            the way you like to travel.
+            A luxury, nature and adventure resort. LUXE-ECO, our experience system, matches every
+            experience to your preferences, budget and schedule.
           </p>
         </div>
 
@@ -56,7 +56,7 @@ export function SiteFooter() {
 
       <div className="border-t border-ivory-50/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-6 text-xs text-ivory-100/60 sm:flex-row sm:items-center sm:justify-between lg:px-10">
-          <p>© LUXE-ECO. Preview site: experiences, prices, availability and illustrations are placeholders.</p>
+          <p>© SOLACE. Preview site: experiences, prices, availability and illustrations are placeholders.</p>
           <a href="#main" className={`inline-flex items-center gap-2 ${linkClass}`}>
             Back to top <ArrowUp className="size-3.5" />
           </a>

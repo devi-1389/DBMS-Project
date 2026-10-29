@@ -11,12 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Viewer } from "@/lib/auth/types";
 import { getDb } from "@/lib/db";
 import { listGuestBookingsBetween } from "@/lib/dal/bookings";
-import { listCatalogue } from "@/lib/dal/catalogue";
 import { getPlan, listPlans } from "@/lib/dal/itinerary";
+import { suggestDaysForPlan } from "@/lib/dal/planner";
 import { getPreferences } from "@/lib/dal/preferences";
-import { addDays } from "@/lib/format";
-import { defaultFilters, filterWindow } from "@/lib/matching/filters";
-import { recommendExperiences, suggestItinerary } from "@/lib/matching/recommend";
+import { resortDayWindow } from "@/lib/format";
 import { ROUTES } from "@/lib/navigation";
 import { DEFAULT_PREFERENCES } from "@/lib/preferences";
 
@@ -67,24 +65,12 @@ async function ItineraryContent({
   // Confirmed bookings are shown alongside, never mixed into the plan.
   const stay = plan?.arrival && plan.departure ? plan : null;
   const bookingWindow = stay
-    ? { from: new Date(`${stay.arrival}T00:00:00.000Z`), to: new Date(`${addDays(stay.departure!, 1)}T00:00:00.000Z`) }
+    ? resortDayWindow(stay.arrival!, stay.departure!)
     : { from: now, to: new Date(now.getTime() + 90 * 86_400_000) };
   const bookings = await listGuestBookingsBetween(db, viewer.userId, bookingWindow.from, bookingWindow.to);
 
-  let suggestions: ReturnType<typeof suggestItinerary> = [];
-  if (stay) {
-    const filters = defaultFilters(preferences, stay, now);
-    const catalogue = await listCatalogue(db, filterWindow(filters));
-    const { recommendations } = recommendExperiences({
-      ...catalogue,
-      preferences,
-      filters,
-      planned: plan!.items,
-      now,
-      limit: 12,
-    });
-    suggestions = suggestItinerary({ recommendations, planned: plan!.items, perDay: 2, limit: 5 });
-  }
+  // LUXE-ECO day planner: fill the stay's days within the remaining activity budget.
+  const suggestions = plan && stay ? await suggestDaysForPlan(db, plan, preferences, now) : null;
 
   return (
     <ItineraryWorkspace

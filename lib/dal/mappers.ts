@@ -1,8 +1,10 @@
+import type { InferSelectViewModel } from "drizzle-orm";
+
 import { isExperienceCategory, type ExperienceCategory } from "@/lib/categories";
 import type * as schema from "@/lib/db/schema";
 import { isInterestId } from "@/lib/interests";
 import { decimalToMinor } from "@/lib/money";
-import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
+import type { ExperienceSlot, ExperienceSummary, SlotReadiness } from "@/lib/types/experience";
 
 type ExperienceRow = typeof schema.experiences.$inferSelect;
 
@@ -39,9 +41,23 @@ export function toExperienceSummary(
   };
 }
 
+export type ReadinessRow = InferSelectViewModel<typeof schema.slotReadiness>;
+
+export function toReadiness(row: ReadinessRow, seatsLeft: number): SlotReadiness {
+  return {
+    ready: row.ready,
+    staff: row.staffNames,
+    resources: row.resourcesConfirmed,
+    missing: row.resourcesMissing,
+    bookableSeats: row.bookableSeats,
+    limitedBy: row.guestLimit !== null && row.guestLimit < seatsLeft ? row.limitingResource : null,
+  };
+}
+
 export function toSlot(
   row: { id: string; startsAt: Date; endsAt: Date; capacity: number; seatsBooked: number },
   experienceSlug: string,
+  readiness?: ReadinessRow | null,
 ): ExperienceSlot {
   return {
     id: row.id,
@@ -50,10 +66,6 @@ export function toSlot(
     endsAt: row.endsAt.toISOString(),
     capacity: row.capacity,
     booked: row.seatsBooked,
+    ...(readiness ? { readiness: toReadiness(readiness, row.capacity - row.seatsBooked) } : {}),
   };
-}
-
-/** Resort-local midnight for a date key. The resort timezone is UTC for now (lib/config.ts). */
-export function dateKeyStart(key: string) {
-  return new Date(`${key}T00:00:00.000Z`);
 }

@@ -7,6 +7,8 @@ export type TimeOfDay = "morning" | "daytime" | "evening";
 
 export type GuestPreferences = {
   interests: InterestId[];
+  /** Favourite experience categories, e.g. nature + adventure + luxury. Empty = no preference. */
+  categories: ExperienceCategory[];
   /** 1–5 per interest; interests without an entry count as 3. */
   interestWeights: Partial<Record<InterestId, number>>;
   /** Highest difficulty the guest is comfortable with. */
@@ -25,6 +27,9 @@ export type ItineraryPlanSummary = {
   name: string;
   arrival: string | null;
   departure: string | null;
+  /** Total activity budget for the plan (whole party), in minor units; null = none. */
+  activityBudgetMinor: number | null;
+  currency: string;
   itemCount: number;
   updatedAt: string;
 };

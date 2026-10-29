@@ -23,11 +23,11 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: {
-    default: "LUXE-ECO | Luxury, Nature & Adventure Resort",
-    template: "%s | LUXE-ECO",
+    default: "SOLACE | Luxury, Nature & Adventure Resort",
+    template: "%s | SOLACE",
   },
   description:
-    "Curated luxury, nature, adventure, wellness, local culture and sustainability experiences, matched to how you like to travel.",
+    "SOLACE resort: luxury, nature, adventure, wellness, local and sustainable experiences, matched to your preferences, budget and schedule by LUXE-ECO.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

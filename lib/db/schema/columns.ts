@@ -13,7 +13,8 @@ export const money = (name: string) => numeric(name, { precision: 10, scale: 2 }
 /** Totals and payment amounts (larger range than per-guest prices). */
 export const moneyTotal = (name: string) => numeric(name, { precision: 12, scale: 2 });
 
-export const currencyCode = () => char("currency", { length: 3 }).notNull().default("USD");
+/** ISO 4217 code. SOLACE prices in Indian rupees (lib/config.ts). */
+export const currencyCode = () => char("currency", { length: 3 }).notNull().default("INR");
 
 export const createdAt = () => timestamp("created_at", { withTimezone: true }).notNull().defaultNow();
 

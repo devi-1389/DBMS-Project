@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, ShieldCheck } from "lucide-react";
 
 import { CategoryBadge } from "@/components/experiences/category-badge";
 import { PriceTag } from "@/components/experiences/price-tag";
 import { AddToPlanButton } from "@/components/itinerary/add-to-plan-button";
 import { formatDate, formatTimeRange } from "@/lib/format";
-import type { Recommendation } from "@/lib/matching/recommend";
+import { bookableSeats, type Recommendation } from "@/lib/matching/recommend";
 import { experienceHref } from "@/lib/navigation";
 
 /** A recommendation with its full, explainable score breakdown. */
@@ -21,7 +21,7 @@ export function RecommendationCard({
   partySize: number;
   planId?: string;
 }) {
-  const { experience, factors, percent, score, maxScore, sessions, fittingSessionCount } = recommendation;
+  const { experience, factors, percent, score, maxScore, sessions, fittingSessionCount, availability } = recommendation;
 
   return (
     <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -82,15 +82,26 @@ export function RecommendationCard({
             </p>
           </div>
 
+          {availability && (
+            <p className="mt-4 flex items-start gap-2 text-xs text-forest-700">
+              <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                <span className="font-semibold">Availability checked:</span> {availability}
+              </span>
+            </p>
+          )}
+
           <ul className="mt-4 divide-y rounded-xl border" aria-label={`Sessions for ${experience.title}`}>
             {sessions.slice(0, 3).map((slot) => {
-              const left = slot.capacity - slot.booked;
+              const left = bookableSeats(slot);
+              const limitedBy = slot.readiness?.limitedBy;
               return (
                 <li key={slot.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <div>
                     <p className="text-sm font-semibold">{formatDate(slot.startsAt)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatTimeRange(slot.startsAt, slot.endsAt)} · {left > 0 ? `${left} seats left` : "Full"}
+                      {formatTimeRange(slot.startsAt, slot.endsAt)} ·{" "}
+                      {left > 0 ? `${left} ${left === 1 ? "place" : "places"} left${limitedBy ? ` (shared ${limitedBy} pool)` : ""}` : "Full"}
                     </p>
                   </div>
                   <AddToPlanButton slotId={slot.id} partySize={partySize} planId={planId} />

@@ -3,7 +3,7 @@ import { check, date, index, pgTable, smallint, text, timestamp, unique, uuid } 
 
 import { bookings } from "./bookings";
 import { experienceSlots } from "./catalogue";
-import { createdAt, updatedAt } from "./columns";
+import { createdAt, currencyCode, moneyTotal, updatedAt } from "./columns";
 import { guestProfiles } from "./identity";
 
 /** A guest's plan for a stay. Items are plans, not reservations. */
@@ -17,6 +17,9 @@ export const itineraryPlans = pgTable(
     name: text("name").notNull().default("My stay"),
     arrivalDate: date("arrival_date"),
     departureDate: date("departure_date"),
+    /** Total activity spend the guest wants to stay within for this plan (all guests). NULL = no budget. */
+    activityBudget: moneyTotal("activity_budget"),
+    currency: currencyCode(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -27,6 +30,8 @@ export const itineraryPlans = pgTable(
       "itinerary_plans_stay_range",
       sql`${t.arrivalDate} is null or ${t.departureDate} is null or (${t.departureDate} >= ${t.arrivalDate} and ${t.departureDate} - ${t.arrivalDate} <= 21)`,
     ),
+    check("itinerary_plans_budget_range", sql`${t.activityBudget} is null or ${t.activityBudget} between 0 and 10000000`),
+    check("itinerary_plans_currency_format", sql`${t.currency} ~ '^[A-Z]{3}$'`),
   ],
 );
 

@@ -22,6 +22,20 @@
       "when": 1793302717980,
       "tag": "0002_guest_last_name_optional",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793306557236,
+      "tag": "0003_solace_budget_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793306567962,
+      "tag": "0004_slot_readiness",
+      "breakpoints": true
     }
   ]
 }

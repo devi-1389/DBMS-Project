@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import { ROLES } from "@/lib/auth/roles";
+import { EXPERIENCE_CATEGORIES } from "@/lib/categories";
 import { DIFFICULTIES } from "@/lib/difficulty";
 import { daysBetween, isDateKey } from "@/lib/format";
 import { INTERESTS, type InterestId } from "@/lib/interests";
@@ -12,6 +13,8 @@ import { GROUP_SIZE_LIMITS, NOTES_MAX_LENGTH } from "@/lib/preferences";
 const INTEREST_IDS = INTERESTS.map((interest) => interest.id) as [InterestId, ...InterestId[]];
 const TIMES = ["morning", "daytime", "evening"] as const;
 export const MAX_PARTY_SIZE = 20;
+/** ₹5,00,000 in paise. */
+export const MAX_ACTIVITY_BUDGET_MINOR = 50_000_000;
 
 const dateKey = z
   .string()
@@ -29,9 +32,10 @@ export const preferencesSchema = z.strictObject({
     .array(z.enum(INTEREST_IDS, { error: "Unknown interest." }))
     .min(1, "Choose at least one interest.")
     .max(INTERESTS.length),
+  categories: z.array(z.enum(EXPERIENCE_CATEGORIES, { error: "Unknown category." })).max(EXPERIENCE_CATEGORIES.length).default([]),
   interestWeights: z.partialRecord(z.enum(INTEREST_IDS), z.number().int().min(1).max(5)).default({}),
   pace: z.enum(DIFFICULTIES, { error: "Choose a pace." }),
-  budgetMaxMinor: z.number().int().min(0, "Budget can't be negative.").max(1_000_000).nullable(),
+  budgetMaxMinor: z.number().int().min(0, "Budget can't be negative.").max(10_000_000, "Budget can be at most ₹1,00,000.").nullable(),
   groupSize: z
     .number({ error: "Enter a group size." })
     .int("Group size must be a whole number.")
@@ -48,6 +52,14 @@ export const planSchema = z
     name: z.string().trim().min(1, "Give your plan a name.").max(80, "Use 80 characters or fewer."),
     arrival: dateKey.nullable(),
     departure: dateKey.nullable(),
+    /** Activity budget for the whole party, in minor units (paise). */
+    activityBudgetMinor: z
+      .number({ error: "Enter a budget in rupees." })
+      .int("Use whole rupees.")
+      .min(0, "Budget can't be negative.")
+      .max(MAX_ACTIVITY_BUDGET_MINOR, "Budget can be at most ₹5,00,000.")
+      .nullable()
+      .default(null),
   })
   .superRefine((plan, ctx) => {
     if (!plan.arrival || !plan.departure) return;

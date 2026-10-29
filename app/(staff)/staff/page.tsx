@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { StaffSchedule, StaffScheduleSkeleton } from "@/components/staff/staff-schedule";
 import type { Viewer } from "@/lib/auth/types";
 import { getDb } from "@/lib/db";
+import { addDays, resortDayWindow, toDateKey } from "@/lib/format";
 import { getStaffSchedule } from "@/lib/dal/staff";
 import { ROUTES } from "@/lib/navigation";
 
@@ -32,9 +33,8 @@ export default function StaffPage() {
 }
 
 async function StaffContent({ viewer }: { viewer: Viewer }) {
-  const from = new Date();
-  from.setUTCHours(0, 0, 0, 0);
-  const to = new Date(from.getTime() + WINDOW_DAYS * 86_400_000);
+  const today = toDateKey(new Date().toISOString());
+  const { from, to } = resortDayWindow(today, addDays(today, WINDOW_DAYS - 1));
   // Staff only ever receive their own assignments; administrators see every assignment.
   const sessions = await getStaffSchedule(getDb(), viewer, { from, to });
   return <StaffSchedule sessions={sessions} showStaff={viewer.role === "admin"} hasStaffRecord={Boolean(viewer.staffId)} />;

@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { CATEGORY_LABELS, EXPERIENCE_CATEGORIES } from "@/lib/categories";
 import { DIFFICULTIES, DIFFICULTY_LABELS, type Difficulty } from "@/lib/difficulty";
 import { formatPrice, formatTime } from "@/lib/format";
 import { INTERESTS } from "@/lib/interests";
@@ -55,6 +56,7 @@ const comparable = (preferences: GuestPreferences) => JSON.stringify({ ...prefer
 function toInput(preferences: GuestPreferences) {
   return {
     interests: preferences.interests,
+    categories: preferences.categories,
     interestWeights: preferences.interestWeights,
     pace: preferences.pace,
     budgetMaxMinor: preferences.budgetMaxMinor,
@@ -142,6 +144,31 @@ function PreferencesForm({ experiences, slots, initial, saved, now }: PlannerPro
                 }
               >
                 {interest.label}
+              </ToggleChip>
+            ))}
+          </div>
+        </Section>
+
+        <Section
+          id="pref-categories"
+          title="Favourite kinds of experience"
+          description="Optional, e.g. nature + adventure + luxury. Favourites score higher; nothing is hidden."
+          error={errors.categories}
+        >
+          <div className="flex flex-wrap gap-2">
+            {EXPERIENCE_CATEGORIES.map((category) => (
+              <ToggleChip
+                key={category}
+                pressed={draft.categories.includes(category)}
+                onPressedChange={(on) =>
+                  update({
+                    categories: on
+                      ? [...draft.categories, category]
+                      : draft.categories.filter((item) => item !== category),
+                  })
+                }
+              >
+                {CATEGORY_LABELS[category]}
               </ToggleChip>
             ))}
           </div>

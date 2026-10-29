@@ -9,7 +9,7 @@ import { MatchCard, MatchListSkeleton } from "@/components/preferences/match-car
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatDate, formatPrice, formatTimeRange } from "@/lib/format";
+import { formatAmount, formatDate, formatTimeRange } from "@/lib/format";
 import { INTEREST_LABELS } from "@/lib/interests";
 import { itineraryTotal } from "@/lib/itinerary";
 import type { Recommendation } from "@/lib/matching/recommend";
@@ -49,7 +49,7 @@ export function DashboardView({
           <StatCard
             icon={Wallet}
             label="Plan estimate"
-            value={formatPrice(itineraryTotal(plan?.items ?? []), plan?.items[0]?.currency)}
+            value={formatAmount(itineraryTotal(plan?.items ?? []), plan?.currency)}
             hint="Planned, not booked"
           />
         </li>

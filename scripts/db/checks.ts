@@ -56,7 +56,7 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
   const staff = (email: string) => `(SELECT id FROM staff_members WHERE email = '${email}')`;
   const book = (reference: string, email: string, slotSql: string, party: number, status = "confirmed") =>
     `INSERT INTO bookings (reference, guest_id, slot_id, party_size, unit_price, status, idempotency_key)
-     VALUES ('${reference}', ${user(email)}, ${slotSql}, ${party}, 420.00, '${status}', gen_random_uuid())`;
+     VALUES ('${reference}', ${user(email)}, ${slotSql}, ${party}, 5500.00, '${status}', gen_random_uuid())`;
 
   // ---------------------------------------------------------------- seeded data
   await expectValue(
@@ -87,15 +87,15 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
     `SELECT count(*) FROM booking_status_history WHERE changed_by_user_id IS NULL`,
     0,
   );
-  await expectValue("money: generated total is exact (420.00 × 2)", `SELECT total_amount::text FROM bookings WHERE reference = 'LX-8TB2'`, "840.00");
+  await expectValue("money: generated total is exact (5500.00 × 2)", `SELECT total_amount::text FROM bookings WHERE reference = 'LX-8TB2'`, "11000.00");
 
   // ---------------------------------------------------------------- seats and concurrency rules
-  const fixture = slot("canopy-sunset-dining", "2026-11-20 17:30+00");
+  const fixture = slot("canopy-sunset-dining", "2026-11-20 17:30+05:30");
   const seats = `SELECT seats_booked FROM experience_slots WHERE id = ${fixture}`;
   await expectOk(
     "slot: a session can be scheduled outside blackouts",
     `INSERT INTO experience_slots (experience_id, starts_at, ends_at, capacity)
-     SELECT id, '2026-11-20 17:30+00', '2026-11-20 20:30+00', 3 FROM experiences WHERE slug = 'canopy-sunset-dining'`,
+     SELECT id, '2026-11-20 17:30+05:30', '2026-11-20 20:30+05:30', 3 FROM experiences WHERE slug = 'canopy-sunset-dining'`,
   );
   await expectOk("booking: within capacity succeeds", book("LX-TEST01", "m.okafor@example.com", fixture, 1));
   await expectError(
@@ -120,7 +120,7 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
   await expectError(
     "booking: can't be moved to another slot",
     "LXB03",
-    `UPDATE bookings SET slot_id = ${slot("canopy-sunset-dining", "2026-11-05 17:30+00")} WHERE reference = 'LX-TEST03'`,
+    `UPDATE bookings SET slot_id = ${slot("canopy-sunset-dining", "2026-11-05 17:30+05:30")} WHERE reference = 'LX-TEST03'`,
   );
   await expectOk("booking: cancellation is allowed", `UPDATE bookings SET status = 'cancelled' WHERE reference = 'LX-TEST03'`);
   await expectValue("booking: cancellation releases seats", seats, 1);
@@ -133,12 +133,12 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
     "booking: pending bookings need a hold expiry",
     "23514",
     `INSERT INTO bookings (reference, guest_id, slot_id, party_size, unit_price, status, idempotency_key)
-     VALUES ('LX-TEST06', ${user("s.haddad@example.com")}, ${fixture}, 1, 420.00, 'pending', gen_random_uuid())`,
+     VALUES ('LX-TEST06', ${user("s.haddad@example.com")}, ${fixture}, 1, 5500.00, 'pending', gen_random_uuid())`,
   );
   await expectValue("booking: failed insert rolled back its seat change", seats, 1);
   const idempotent = (reference: string) =>
     `INSERT INTO bookings (reference, guest_id, slot_id, party_size, unit_price, status, idempotency_key)
-     VALUES ('${reference}', ${user("s.haddad@example.com")}, ${fixture}, 1, 420.00, 'confirmed',
+     VALUES ('${reference}', ${user("s.haddad@example.com")}, ${fixture}, 1, 5500.00, 'confirmed',
              '22222222-2222-4222-8222-222222222222')
      ON CONFLICT (guest_id, idempotency_key) DO NOTHING`;
   await expectOk("booking: idempotent insert succeeds", idempotent("LX-TEST08"));
@@ -160,13 +160,13 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
     "slot: can't be scheduled inside an experience blackout",
     "LXT02",
     `INSERT INTO experience_slots (experience_id, starts_at, ends_at, capacity)
-     SELECT id, '2026-11-14 10:00+00', '2026-11-14 12:00+00', 4 FROM experiences WHERE slug = 'ridge-line-summit-trek'`,
+     SELECT id, '2026-11-14 10:00+05:30', '2026-11-14 12:00+05:30', 4 FROM experiences WHERE slug = 'ridge-line-summit-trek'`,
   );
   await expectError(
     "slot: can't be scheduled inside a resort-wide blackout",
     "LXT02",
     `INSERT INTO experience_slots (experience_id, starts_at, ends_at, capacity)
-     SELECT id, '2026-11-16 07:00+00', '2026-11-16 08:30+00', 4 FROM experiences WHERE slug = 'lakeside-sunrise-yoga'`,
+     SELECT id, '2026-11-16 07:00+05:30', '2026-11-16 08:30+05:30', 4 FROM experiences WHERE slug = 'lakeside-sunrise-yoga'`,
   );
 
   // ---------------------------------------------------------------- staff rules
@@ -174,7 +174,7 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
     "staff: overlapping assignment is rejected (canoe 06:30–09:00 vs yoga 07:00)",
     "LXS01",
     `INSERT INTO staff_assignments (slot_id, staff_id, role)
-     VALUES (${slot("lakeside-sunrise-yoga", "2026-11-03 07:00+00")}, ${staff("mara@example.com")}, 'guide')`,
+     VALUES (${slot("lakeside-sunrise-yoga", "2026-11-03 07:00+05:30")}, ${staff("mara@example.com")}, 'guide')`,
   );
   await expectOk(
     "staff: an inactive staff member can be recorded",
@@ -184,7 +184,7 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
     "staff: inactive staff can't be assigned",
     "LXS02",
     `INSERT INTO staff_assignments (slot_id, staff_id, role)
-     VALUES (${slot("lakeside-sunrise-yoga", "2026-11-04 07:00+00")}, ${staff("former@example.com")}, 'support')`,
+     VALUES (${slot("lakeside-sunrise-yoga", "2026-11-04 07:00+05:30")}, ${staff("former@example.com")}, 'support')`,
   );
 
   // ---------------------------------------------------------------- resource rules
@@ -192,21 +192,21 @@ export async function runIntegrityChecks(run: RunSql): Promise<CheckResult[]> {
     "resource: allocation beyond the free units is rejected (telescopes 2 of 2 held)",
     "LXR01",
     `INSERT INTO resource_allocations (resource_id, slot_id, booking_id, quantity)
-     VALUES (${resource("Observatory telescope")}, ${slot("starlit-observatory", "2026-11-02 20:30+00")}, ${bookingId("LX-0WE2")}, 1)`,
+     VALUES (${resource("Observatory telescope")}, ${slot("starlit-observatory", "2026-11-02 20:30+05:30")}, ${bookingId("LX-0WE2")}, 1)`,
   );
   await expectError(
     "resource: allocation must use its booking's slot",
     "LXR04",
     `INSERT INTO resource_allocations (resource_id, slot_id, booking_id, quantity)
-     VALUES (${resource("Observatory telescope")}, ${slot("starlit-observatory", "2026-11-02 20:30+00")}, ${bookingId("LX-4KQ7")}, 1)`,
+     VALUES (${resource("Observatory telescope")}, ${slot("starlit-observatory", "2026-11-02 20:30+05:30")}, ${bookingId("LX-4KQ7")}, 1)`,
   );
   await expectError(
     "resource: maintenance can't take out units already held",
     "LXR03",
     `INSERT INTO resource_maintenance (resource_id, starts_at, ends_at, quantity_out, reason)
-     VALUES (${resource("Observatory telescope")}, '2026-11-02 20:00+00', '2026-11-02 23:00+00', 1, 'Lens cleaning')`,
+     VALUES (${resource("Observatory telescope")}, '2026-11-02 20:00+05:30', '2026-11-02 23:00+05:30', 1, 'Lens cleaning')`,
   );
-  const canoeSlot = slot("river-wildlife-canoe", "2026-11-12 06:30+00");
+  const canoeSlot = slot("river-wildlife-canoe", "2026-11-12 06:30+05:30");
   await expectOk("resource: a booking on a maintenance day succeeds", book("LX-TEST07", "a.moreau@example.com", canoeSlot, 1));
   await expectError(
     "resource: units in maintenance aren't available (4 held + 2 out of 6)",

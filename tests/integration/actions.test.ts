@@ -9,7 +9,7 @@ import type { ClerkSession } from "@/lib/auth/clerk";
 import type { VerifiedIdentity } from "@/lib/auth/types";
 import type { Db } from "@/lib/db/types";
 import { authIdentities, users } from "@/lib/db/schema";
-import { BEFORE_SEASON, createTestDb, SEEDED, viewerByEmail, type TestDb } from "@/tests/support/db";
+import { at, BEFORE_SEASON, createTestDb, SEEDED, viewerByEmail, type TestDb } from "@/tests/support/db";
 
 const state = vi.hoisted(() => ({
   db: undefined as unknown,
@@ -155,9 +155,9 @@ describe("guest actions", () => {
   it("adds a session from an experience page to the guest's plan", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: BEFORE_SEASON });
     await signInAs("a.moreau@example.com");
-    const input = { experienceSlug: "lakeside-sunrise-yoga", startsAt: "2026-11-03T07:00:00.000Z", partySize: 2 };
+    const input = { experienceSlug: "lakeside-sunrise-yoga", startsAt: at("2026-11-03", "07:00"), partySize: 2 };
     expect(await addSessionToPlanAction(input)).toMatchObject({ ok: true, message: expect.stringMatching(/My stay/) });
-    expect(await addSessionToPlanAction({ ...input, startsAt: "2026-11-03T07:05:00.000Z" })).toMatchObject({
+    expect(await addSessionToPlanAction({ ...input, startsAt: at("2026-11-03", "07:05") })).toMatchObject({
       ok: false,
       code: "slot-not-found",
     });

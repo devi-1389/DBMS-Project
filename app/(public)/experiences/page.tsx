@@ -10,7 +10,7 @@ import { listExperiences, listSlots, SAMPLE_WINDOW } from "@/lib/placeholder/cat
 
 export const metadata: Metadata = {
   title: "Experiences",
-  description: "Browse luxury, nature, adventure, wellness, local culture and sustainability experiences.",
+  description: "Browse luxury, nature, adventure, wellness, local and sustainability experiences at SOLACE.",
 };
 
 export default async function ExperiencesPage() {

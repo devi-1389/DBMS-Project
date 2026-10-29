@@ -9,11 +9,12 @@ import {
   experienceSlots,
   itineraryItems,
   itineraryPlans,
+  slotReadiness,
 } from "@/lib/db/schema";
 import type { Db } from "@/lib/db/types";
-import { formatDate, formatDateKey } from "@/lib/format";
+import { formatDate, formatDateKey, joinList } from "@/lib/format";
 import { isOutsideStay, MAX_ITEMS_PER_PLAN, MAX_PLANS_PER_GUEST, overlaps } from "@/lib/itinerary";
-import { decimalToMinor } from "@/lib/money";
+import { decimalToMinor, minorToDecimal } from "@/lib/money";
 import type { ItineraryPlan, ItineraryPlanSummary, PlannedItem } from "@/lib/types/guest";
 import type { PlanInput } from "@/lib/validation/schemas";
 
@@ -28,8 +29,21 @@ const planSummaryColumns = {
   name: itineraryPlans.name,
   arrival: itineraryPlans.arrivalDate,
   departure: itineraryPlans.departureDate,
+  activityBudget: itineraryPlans.activityBudget,
+  currency: itineraryPlans.currency,
   updatedAt: itineraryPlans.updatedAt,
 };
+
+type PlanSummaryRow = { activityBudget: string | null; updatedAt: Date };
+
+/** Database plan row → app shape: money in minor units, ISO timestamps. */
+function toPlanSummary<T extends PlanSummaryRow>({ activityBudget, updatedAt, ...rest }: T) {
+  return {
+    ...rest,
+    activityBudgetMinor: activityBudget === null ? null : decimalToMinor(activityBudget),
+    updatedAt: updatedAt.toISOString(),
+  };
+}
 
 export async function listPlans(db: Db, guestId: string): Promise<ItineraryPlanSummary[]> {
   const rows = await db
@@ -39,7 +53,7 @@ export async function listPlans(db: Db, guestId: string): Promise<ItineraryPlanS
     .where(eq(itineraryPlans.guestId, guestId))
     .groupBy(itineraryPlans.id)
     .orderBy(desc(itineraryPlans.updatedAt));
-  return rows.map((row) => ({ ...row, updatedAt: row.updatedAt.toISOString() }));
+  return rows.map(toPlanSummary);
 }
 
 async function ownedPlan(db: Db, guestId: string, planId: string) {
@@ -103,8 +117,15 @@ export async function getPlan(db: Db, guestId: string, planId: string): Promise<
   const plan = await ownedPlan(db, guestId, planId);
   if (!plan) return null;
   const items = await planItems(db, guestId, planId);
-  return { ...plan, updatedAt: plan.updatedAt.toISOString(), itemCount: items.length, items };
+  return { ...toPlanSummary(plan), itemCount: items.length, items };
 }
+
+const planValues = (input: PlanInput) => ({
+  name: input.name,
+  arrivalDate: input.arrival,
+  departureDate: input.departure,
+  activityBudget: input.activityBudgetMinor === null ? null : minorToDecimal(input.activityBudgetMinor),
+});
 
 export async function createPlan(db: Db, guestId: string, input: PlanInput): Promise<DalResult<{ planId: string }>> {
   const [{ plans }] = await db.select({ plans: count() }).from(itineraryPlans).where(eq(itineraryPlans.guestId, guestId));
@@ -113,7 +134,7 @@ export async function createPlan(db: Db, guestId: string, input: PlanInput): Pro
   }
   const [plan] = await db
     .insert(itineraryPlans)
-    .values({ guestId, name: input.name, arrivalDate: input.arrival, departureDate: input.departure })
+    .values({ guestId, ...planValues(input) })
     .returning({ id: itineraryPlans.id });
   return ok({ planId: plan.id }, `Created “${input.name}”.`);
 }
@@ -126,7 +147,7 @@ export async function updatePlan(
 ): Promise<DalResult<{ planId: string }>> {
   const updated = await db
     .update(itineraryPlans)
-    .set({ name: input.name, arrivalDate: input.arrival, departureDate: input.departure })
+    .set(planValues(input))
     .where(and(eq(itineraryPlans.id, planId), eq(itineraryPlans.guestId, guestId)))
     .returning({ id: itineraryPlans.id });
   return updated.length ? ok({ planId }, "Plan saved.") : fail("plan-not-found", "That plan doesn't exist or isn't yours.");
@@ -152,6 +173,45 @@ async function targetPlan(db: Db, guestId: string, planId: string | undefined) {
   if (latest) return latest;
   const [created] = await db.insert(itineraryPlans).values({ guestId, name: "My stay" }).returning(planSummaryColumns);
   return created;
+}
+
+const readinessColumns = {
+  ready: slotReadiness.ready,
+  staffAssigned: slotReadiness.staffAssigned,
+  missing: slotReadiness.resourcesMissing,
+  bookableSeats: slotReadiness.bookableSeats,
+  limitingResource: slotReadiness.limitingResource,
+};
+
+type ReadinessCheck = {
+  ready: boolean | null;
+  staffAssigned: number | null;
+  missing: string[] | null;
+  bookableSeats: number | null;
+  limitingResource: string | null;
+};
+
+/**
+ * LUXE-ECO availability check: the session needs its guide or host, its venue/boats/
+ * vehicle, and enough units in shared equipment pools for the party.
+ */
+function readinessProblem(slot: ReadinessCheck, partySize: number) {
+  if (slot.ready === false) {
+    const missing = slot.missing ?? [];
+    const why = !slot.staffAssigned
+      ? "no guide or host is assigned yet"
+      : `${joinList(missing)} ${missing.length > 1 ? "aren't" : "isn't"} available`;
+    return fail("slot-not-ready", `This session can't run as scheduled: ${why}. Please pick another session.`);
+  }
+  if (slot.bookableSeats !== null && partySize > slot.bookableSeats) {
+    const places = `${slot.bookableSeats} ${slot.bookableSeats === 1 ? "place" : "places"}`;
+    return fail(
+      "not-enough-equipment",
+      `Only ${places} left: the shared ${slot.limitingResource ?? "equipment"} pool is nearly in use for this time. Plans don't hold equipment.`,
+      "partySize",
+    );
+  }
+  return null;
 }
 
 const touchPlan = (db: Db, planId: string) =>
@@ -183,9 +243,11 @@ export async function addItem(
         title: experiences.title,
         maxGroupSize: experiences.maxGroupSize,
         experienceStatus: experiences.status,
+        ...readinessColumns,
       })
       .from(experienceSlots)
       .innerJoin(experiences, eq(experiences.id, experienceSlots.experienceId))
+      .leftJoin(slotReadiness, eq(slotReadiness.slotId, experienceSlots.id))
       .where(eq(experienceSlots.id, input.slotId))
       .limit(1);
 
@@ -210,6 +272,8 @@ export async function addItem(
         "partySize",
       );
     }
+    const notReady = readinessProblem(slot, input.partySize);
+    if (notReady) return notReady;
     const startsAt = slot.startsAt.toISOString();
     if (isOutsideStay(startsAt, plan.arrival, plan.departure)) {
       return fail(
@@ -264,9 +328,15 @@ export async function updateItemPartySize(
     const item = await ownedItem(tx, guestId, input.itemId);
     if (!item) return fail("item-not-found", "That plan item doesn't exist or isn't yours.");
     const [slot] = await tx
-      .select({ capacity: experienceSlots.capacity, seatsBooked: experienceSlots.seatsBooked, maxGroupSize: experiences.maxGroupSize })
+      .select({
+        capacity: experienceSlots.capacity,
+        seatsBooked: experienceSlots.seatsBooked,
+        maxGroupSize: experiences.maxGroupSize,
+        ...readinessColumns,
+      })
       .from(experienceSlots)
       .innerJoin(experiences, eq(experiences.id, experienceSlots.experienceId))
+      .leftJoin(slotReadiness, eq(slotReadiness.slotId, experienceSlots.id))
       .where(eq(experienceSlots.id, item.slotId));
     const maxParty = Math.min(slot.capacity, slot.maxGroupSize);
     if (input.partySize > maxParty) return fail("party-too-large", `Up to ${maxParty} guests per session.`, "partySize");
@@ -274,6 +344,8 @@ export async function updateItemPartySize(
     if (input.partySize > seatsLeft) {
       return fail("not-enough-seats", `Only ${Math.max(seatsLeft, 0)} seats left for this session.`, "partySize");
     }
+    const notReady = readinessProblem(slot, input.partySize);
+    if (notReady) return notReady;
     await tx.update(itineraryItems).set({ partySize: input.partySize }).where(eq(itineraryItems.id, item.id));
     await touchPlan(tx, item.planId);
     return ok(null, "Guests updated.");

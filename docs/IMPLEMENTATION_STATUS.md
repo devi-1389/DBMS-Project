@@ -1,12 +1,25 @@
 # LUXE-ECO Implementation Status
 
-Last updated: 2026-10-29 (Phase 3 + 5: authentication and personalization)
+The SOLACE resort website, built on LUXE-ECO, its experience-management system.
+
+Last updated: 2026-10-29 (SOLACE alignment with the project brief, after Phase 3 + 5)
 
 Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not started ·
 `[mock]` UI exists but uses placeholder data (not a working feature)
 
 ## Current state
 
+- **SOLACE alignment (latest):**
+  - The site is branded SOLACE, and LUXE-ECO names the matching and planning system.
+  - Prices are in ₹ and times in IST.
+  - 18 experiences now cover the brief, including spa, kayaking, cycling, a local food
+    trail, a heritage village walk and a cabana.
+  - Matching only uses sessions with a guide, venue and shared equipment free (the
+    `slot_readiness` view).
+  - Guests can pick favourite categories, and plans take an activity budget with
+    day-by-day suggestions.
+  - See "SOLACE alignment" below. Signed-in pages for these features haven't been
+    viewed in a browser (no Clerk keys); they're covered by tests.
 - **Authentication and personalization are implemented, but not yet run against real
   services.** No Clerk keys or Neon credentials exist in this environment, and clerk.com
   is blocked by its network policy. Server logic is covered by automated tests (Clerk
@@ -28,9 +41,13 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
   rows.
 - Removed this phase: `localStorage` drafts (`lib/preview-store.ts`), the preview login
   forms, and `lib/matching/score.ts`. The new explainable engine replaces it.
-- Database design (Phase 4): 26 tables, 2 views, and migrations `0000`–`0002` (`0002`
-  makes a guest's last name optional). Applied to PGlite and local PostgreSQL only; not
-  yet to Neon. See `docs/DATABASE_DESIGN.md` and `docs/ERD.md`.
+- Database design: 27 tables, 3 views, and migrations `0000`–`0004`:
+  - `0002`: a guest's last name is optional.
+  - `0003`: INR defaults, favourite categories and plan budgets.
+  - `0004`: the `slot_readiness` view.
+
+  Applied to PGlite only this round; not yet to Neon. See `docs/DATABASE_DESIGN.md` and
+  `docs/ERD.md`.
 - Installed, in addition to Phases 0–4: `@clerk/nextjs@7.9.22` and `zod@4.6.7`; dev
   `vitest@5.0.5` and `@types/node@22`. `engines.node` is `>=22`.
 - `npm audit`: production dependencies clean (0). The 4 moderate dev-only advisories are
@@ -147,7 +164,7 @@ Code complete and tested with Clerk mocked; **not yet run with real Clerk keys**
       against production.
 - [~] Seed run against **Neon**: not done here (no credentials). Ran on PostgreSQL 16 and PGlite.
 - [x] `docs/ERD.md` (Mermaid; all 7 diagrams render), `docs/DATABASE_DESIGN.md`,
-      `sql/queries.sql` (16 queries)
+      `sql/queries.sql` (16 queries; 20 since the SOLACE alignment)
 - [x] Checks: `npm run db:verify` (offline, PGlite) and `npm run db:test:concurrency`
       (parallel psql sessions)
 - [x] Vitest set up (`npm test`), with unit tests and PGlite integration tests in `tests/`
@@ -176,6 +193,52 @@ Code complete and tested with Clerk mocked; **not yet run with real Clerk keys**
       - Explainable factor scores, plus "suggested days" that save nothing until added.
 - [x] Booking detail page `/my-bookings/[reference]` (owner, assigned staff or admin)
 - [x] Staff schedule `/staff` with guest manifests (shortened names)
+
+## SOLACE alignment (project brief)
+
+Brief: *Guest → Preferences → Experience Matching → Resource Availability → Booking →
+Experience → Feedback*, across luxury, nature, adventure, wellness, local experiences,
+sustainability and resource sharing.
+
+- [x] Brand: SOLACE in the logo, titles, header, footer and landing copy. LUXE-ECO is
+      named as the system, and the landing page shows its flow and a "Shared, not
+      owned" pillar. "Local Culture" is now "Local Experiences".
+- [x] Locale: INR and en-IN (`₹15,000`, `₹1,00,000`), resort time Asia/Kolkata.
+      - Helpers `resortTime()` and `resortDayWindow()` build resort-local instants.
+      - Converted to them: sessions, seed windows, page date windows, SQL queries and
+        integrity checks.
+      - DB currency default is INR (`0003`).
+      - The zone is inferred from ₹; change `lib/config.ts` if the resort is elsewhere.
+- [mock] Catalogue: 6 new experiences, now 18 in total. Placeholder copy, prices and
+      generated illustrations.
+      - Signature Spa Ritual, Lake Kayak Expedition, Valley Cycle Trail, Inlet Food
+        Trail (local catch), Heritage Village Walk and Private Lakeside Cabana.
+      - Seed: 5 new staff leads, 5 new resources (shared kayaks, bicycles, binoculars,
+        spa suites, cabanas), new requirements, and a kayak maintenance window.
+- [x] Resource availability: the `slot_readiness` view (`0004`) reports, for each
+      session:
+      - The staff assigned, and the per-session holds (venue, boats, vehicle).
+      - How many more guests the shared per-guest pools can take after overlapping
+        holds and maintenance.
+
+      Recommendations skip sessions that can't run and cap places by equipment. Each
+      match says who leads it and what's confirmed. `addItem` and party-size changes
+      refuse with `slot-not-ready` or `not-enough-equipment`.
+- [x] Favourite categories (`guest_preferred_categories`): chosen on `/preferences`;
+      they're an explained scoring factor (3 points).
+- [x] Activity budget per plan (`itinerary_plans.activity_budget`): set in the plan
+      form; the itinerary shows what's left or over.
+- [x] Day-by-day planner (`lib/dal/planner.ts`):
+      - Fills each stay day with up to two non-overlapping sessions that can run.
+      - Matches of at least 50% only, preferred times first.
+      - Stays within the remaining budget and reports matches left out for budget.
+      - The brief's example (3 days, nature + adventure + luxury, ₹15,000, mornings)
+        is an integration test. It gives 5 sessions over 3 days for ₹11,200, with a
+        morning session each day.
+- [x] SQL examples Q17–Q20: readiness, shared pools, budgets, favourite categories.
+- [ ] Guest gear lending (borrow a bicycle or camera outside an experience): not
+      modelled yet; it would be a loan table with the same capacity trigger.
+- [ ] Booking and feedback steps of the brief: Phase 6 (bookings) and Phase 7 (reviews).
 
 ## Phase 6: Bookings (transactional)
 
@@ -240,6 +303,12 @@ once, run `db:set-role` for the first admin, and check the flows by hand.
 | 2026-10-29 | 3+5   | `npm run build` | Pass. Protected pages, `/login` and `/sign-up` are partial prerenders; the webhook is dynamic. First attempt failed (`usePathname` outside `<Suspense>` on `/my-bookings/[reference]`); fixed. |
 | 2026-10-29 | 3+5   | Playwright on `next start` (no Clerk keys; ad hoc script, not in repo) | 33/33 pass: public pages 200; add-to-plan refused with a clear message; all 8 protected routes go to `/login?redirect_url=…` with no private data; raw 307; webhook 503; no overflow at 375px (fixed a pre-existing overflow on experiences with 14 session dates); no console errors |
 | 2026-10-29 | 3+5   | Real Clerk sign-up/sign-in, Neon reads/writes | Not run: no Clerk keys or Neon credentials here |
+| 2026-10-29 | SOLACE | `npx tsc --noEmit` / `npm run lint` | Pass |
+| 2026-10-29 | SOLACE | `npm test` | 96/96 pass. New: IST and ₹ formatting; readiness filtering and equipment caps; favourite-category factor; day planner (spread, budget, 50% minimum); validation of categories and budgets; DB readiness, equipment and guide checks; the brief's ₹15,000 three-day example |
+| 2026-10-29 | SOLACE | `npm run db:verify` / `npm run db:check` | 71/71 pass (migrations `0000`–`0004`, seed, 47 integrity checks, 4 money checks, 20 queries) / "Everything's fine" |
+| 2026-10-29 | SOLACE | `npm run build` | Pass (35 static/partial pages incl. 18 experience pages) |
+| 2026-10-29 | SOLACE | Playwright on `next start` (no Clerk keys; ad hoc scripts, not in repo) | 27/27 rebrand checks (SOLACE title and logo, LUXE-ECO copy, ₹ only, 18 experiences, 6 new detail pages, 7:00 am IST times, no overflow at 375px, no console errors) and 33/33 auth checks again |
+| 2026-10-29 | SOLACE | Signed-in pages (budget, categories, day planner) in a browser | Not run: needs Clerk keys. Logic covered by integration tests |
 
 Known Next 16 behaviour: the previous route stays mounted but hidden (`display: none`)
 for instant back navigation, so DOM queries in tests must ignore hidden elements.

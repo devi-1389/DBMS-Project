@@ -31,6 +31,23 @@ export type ExperienceSummary = {
   featured: boolean;
 };
 
+/**
+ * Whether a session can actually run (from the `slot_readiness` view): its guide or host
+ * is assigned, its venue/boats/vehicles are held, and shared equipment pools have units.
+ */
+export type SlotReadiness = {
+  ready: boolean;
+  staff: string[];
+  /** Resources confirmed for the session. */
+  resources: string[];
+  /** Resources that aren't available. */
+  missing: string[];
+  /** Seats a new party can actually use: seats left, capped by shared equipment pools. */
+  bookableSeats: number;
+  /** The shared pool that caps seats, when it does (e.g. "Single kayak"). */
+  limitedBy: string | null;
+};
+
 /** A scheduled session of an experience. Times are ISO 8601 strings. */
 export type ExperienceSlot = {
   id: string;
@@ -39,6 +56,8 @@ export type ExperienceSlot = {
   endsAt: string;
   capacity: number;
   booked: number;
+  /** Present for database sessions; placeholder sessions have none. */
+  readiness?: SlotReadiness;
 };
 
 export type CategoryHighlight = {

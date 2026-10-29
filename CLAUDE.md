@@ -1,10 +1,11 @@
 @AGENTS.md
 
-# LUXE-ECO
+# SOLACE · LUXE-ECO
 
-Integrated Luxury, Nature & Adventure Resort Experience Management System.
-Guests discover and book resort experiences; staff manage slots, resources and
-assignments; admins oversee payments, reviews and operations.
+Website of the SOLACE resort, built on LUXE-ECO (Integrated Luxury, Nature & Adventure
+Resort Experience Management System): guest preferences → matching → resource
+availability (staff, venues, shared equipment) → booking → experience → feedback.
+Brand the UI as SOLACE; LUXE-ECO names the matching/planning system.
 
 Plan: `docs/IMPLEMENTATION_PLAN.md`. Progress: `docs/IMPLEMENTATION_STATUS.md`.
 Read both before starting work, and update the status file at the end of every phase.
@@ -65,11 +66,13 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
   resource/staff availability under a row lock or conditional update. Use the
   Neon WebSocket driver (`drizzle-orm/neon-serverless`) for transactions,
   because `neon-http` has no interactive transactions.
-- Schema lives in `lib/db/schema/` (normalized, 26 tables). Integrity rules Drizzle
-  can't express are triggers in `drizzle/0001_integrity.sql`; add new ones with
+- Schema lives in `lib/db/schema/` (normalized, 27 tables, 3 views). Rules Drizzle can't
+  express are triggers/views in custom migrations (`0001`, `0004`); add new ones with
   `drizzle-kit generate --custom`. Never edit a migration that has been applied.
 - Money: `numeric(10,2)`/`numeric(12,2)` plus currency code in the DB, integer minor
   units in the app; convert only with `lib/money.ts`. Times are `timestamptz` (UTC).
+- Resort locale is INR and IST (`lib/config.ts`). Build resort-local instants and day
+  windows with `resortTime()` / `resortDayWindow()` (`lib/format.ts`), never `…T00:00Z`.
 - Stay Vercel-compatible: no long-lived servers, local file writes or custom
   Node servers. Keep code Node runtime unless edge is required.
 

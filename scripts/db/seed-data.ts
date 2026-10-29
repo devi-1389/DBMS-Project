@@ -2,12 +2,17 @@
 // Experiences, sessions and sample bookings are NOT repeated here; the seed reads
 // them from lib/placeholder/catalogue.ts. Names, emails and IDs are invented and use
 // the reserved example.com domain. Never seed this into production.
+import { resortTime } from "@/lib/format";
+import type { ExperienceCategory } from "@/lib/categories";
 import type { InterestId } from "@/lib/interests";
 
 type SupplierKind = "activity_operator" | "local_host" | "equipment_rental" | "food_producer" | "transport";
 type ResourceKind = "vehicle" | "watercraft" | "equipment" | "venue" | "other";
 
-export const admin = { email: "admin@example.com", displayName: "Resort admin (sample)" };
+/** A resort-local (IST) date and time as an ISO instant. */
+const at = (day: string, time: string) => resortTime(day, time).toISOString();
+
+export const admin = { email: "admin@example.com", displayName: "SOLACE admin (sample)" };
 
 export const suppliers: {
   name: string;
@@ -30,6 +35,7 @@ export const suppliers: {
   },
   { name: "Lakeside Outfitters", kind: "equipment_rental", contactEmail: "rentals@lakeside.example.com", experiences: [] },
   { name: "Green Valley Transport", kind: "transport", contactEmail: "dispatch@gv-transport.example.com", experiences: [] },
+  { name: "Inlet Fisherfolk Collective", kind: "food_producer", contactEmail: "catch@inlet-collective.example.com", experiences: ["inlet-food-trail"] },
 ];
 
 /** `leads`: experiences this person leads. Chosen so no one has overlapping sessions. */
@@ -50,6 +56,11 @@ export const staff: {
   { key: "arun", displayName: "Arun Mehta", jobTitle: "Executive chef", email: "arun@example.com", hasAccount: false, hiredOn: "2021-11-01", leads: ["canopy-sunset-dining"] },
   { key: "sofia", displayName: "Sofia Okoro", jobTitle: "Community host", email: "sofia@example.com", hasAccount: false, hiredOn: "2024-02-01", leads: ["village-harvest-table", "artisan-craft-workshop"] },
   { key: "noah", displayName: "Noah Fischer", jobTitle: "Restoration lead", email: "noah@example.com", hasAccount: true, hiredOn: "2022-08-15", leads: ["reforestation-morning", "behind-the-green-scenes"] },
+  { key: "priya", displayName: "Priya Nair", jobTitle: "Spa therapist", email: "priya@example.com", hasAccount: false, hiredOn: "2023-01-09", leads: ["signature-spa-ritual"] },
+  { key: "ravi", displayName: "Ravi Kumar", jobTitle: "Water sports instructor", email: "ravi@example.com", hasAccount: false, hiredOn: "2024-03-18", leads: ["lake-kayak-expedition"] },
+  { key: "vikram", displayName: "Vikram Singh", jobTitle: "Cycling guide", email: "vikram@example.com", hasAccount: false, hiredOn: "2025-02-03", leads: ["valley-cycle-trail"] },
+  { key: "anita", displayName: "Anita Rao", jobTitle: "Heritage guide", email: "anita@example.com", hasAccount: false, hiredOn: "2022-11-21", leads: ["heritage-village-walk", "inlet-food-trail"] },
+  { key: "meera", displayName: "Meera Iyer", jobTitle: "Guest butler", email: "meera@example.com", hasAccount: false, hiredOn: "2024-07-01", leads: ["lakeside-cabana"] },
 ];
 
 export const resources: { name: string; kind: ResourceKind; quantity: number; location: string; supplier?: string }[] = [
@@ -62,6 +73,12 @@ export const resources: { name: string; kind: ResourceKind; quantity: number; lo
   { name: "Lakeside pavilion", kind: "venue", quantity: 1, location: "Lakeside Pavilion" },
   { name: "Makers' studio", kind: "venue", quantity: 1, location: "Makers' studios" },
   { name: "Planting tool kit", kind: "equipment", quantity: 20, location: "Nursery barn" },
+  // Shared pools: several experiences draw on the same units (resource sharing).
+  { name: "Single kayak", kind: "watercraft", quantity: 10, location: "Boathouse", supplier: "Lakeside Outfitters" },
+  { name: "Resort bicycle", kind: "equipment", quantity: 14, location: "Cycle shed" },
+  { name: "Wildlife binoculars", kind: "equipment", quantity: 12, location: "Naturalist desk" },
+  { name: "Spa treatment suite", kind: "venue", quantity: 2, location: "Garden Spa" },
+  { name: "Lakeside cabana", kind: "venue", quantity: 3, location: "South Shore" },
 ];
 
 export const requirements: {
@@ -81,18 +98,27 @@ export const requirements: {
   { experience: "canopy-sunset-dining", resource: "Lakeside pavilion", basis: "per_session", quantity: 1 },
   { experience: "artisan-craft-workshop", resource: "Makers' studio", basis: "per_session", quantity: 1 },
   { experience: "reforestation-morning", resource: "Planting tool kit", basis: "per_guest", quantity: 1 },
+  { experience: "signature-spa-ritual", resource: "Spa treatment suite", basis: "per_session", quantity: 1 },
+  { experience: "lake-kayak-expedition", resource: "Single kayak", basis: "per_guest", quantity: 1 },
+  { experience: "valley-cycle-trail", resource: "Resort bicycle", basis: "per_guest", quantity: 1 },
+  { experience: "inlet-food-trail", resource: "Electric shuttle van", basis: "per_session", quantity: 1 },
+  { experience: "lakeside-cabana", resource: "Lakeside cabana", basis: "per_session", quantity: 1 },
+  // The dawn canoe (06:30–09:00) and forest trail (08:00–11:00) overlap, so they share one binocular pool.
+  { experience: "river-wildlife-canoe", resource: "Wildlife binoculars", basis: "per_guest", quantity: 1 },
+  { experience: "old-growth-forest-trail", resource: "Wildlife binoculars", basis: "per_guest", quantity: 1 },
 ];
 
 /** Windows chosen to leave enough units for the sample schedule. */
 export const maintenance = [
-  { resource: "Electric shuttle van", startsAt: "2026-11-10T00:00:00.000Z", endsAt: "2026-11-11T00:00:00.000Z", quantityOut: 1, reason: "Scheduled battery service" },
-  { resource: "Two-person canoe", startsAt: "2026-11-12T00:00:00.000Z", endsAt: "2026-11-14T00:00:00.000Z", quantityOut: 2, reason: "Hull repairs" },
+  { resource: "Electric shuttle van", startsAt: at("2026-11-10", "00:00"), endsAt: at("2026-11-11", "00:00"), quantityOut: 1, reason: "Scheduled battery service" },
+  { resource: "Two-person canoe", startsAt: at("2026-11-12", "00:00"), endsAt: at("2026-11-14", "00:00"), quantityOut: 2, reason: "Hull repairs" },
+  { resource: "Single kayak", startsAt: at("2026-11-09", "00:00"), endsAt: at("2026-11-10", "00:00"), quantityOut: 4, reason: "Rudder replacement" },
 ];
 
 /** `experience: null` = resort-wide. Seeded sessions inside a blackout are stored as cancelled. */
 export const blackouts: { experience: string | null; startsAt: string; endsAt: string; reason: string }[] = [
-  { experience: "ridge-line-summit-trek", startsAt: "2026-11-14T00:00:00.000Z", endsAt: "2026-11-15T00:00:00.000Z", reason: "Ridge path closed for trail repairs" },
-  { experience: null, startsAt: "2026-11-16T00:00:00.000Z", endsAt: "2026-11-17T00:00:00.000Z", reason: "Resort closed for annual staff day" },
+  { experience: "ridge-line-summit-trek", startsAt: at("2026-11-14", "00:00"), endsAt: at("2026-11-15", "00:00"), reason: "Ridge path closed for trail repairs" },
+  { experience: null, startsAt: at("2026-11-16", "00:00"), endsAt: at("2026-11-17", "00:00"), reason: "Resort closed for annual staff day" },
 ];
 
 /** Guest-name → email for the guests named in the catalogue's sample bookings. */
@@ -107,8 +133,9 @@ export const sampleGuestPreferences = {
     { id: "water", weight: 4 },
     { id: "mindfulness", weight: 3 },
   ] satisfies { id: InterestId; weight: number }[],
+  categories: ["nature", "wellness", "luxury"] satisfies ExperienceCategory[],
   maxDifficulty: "easy" as const,
-  budgetPerGuestMinor: 15_000,
+  budgetPerGuestMinor: 300_000, // ₹3,000 per guest per experience
   usualGroupSize: 2,
   timesOfDay: ["morning" as const],
   needsStepFree: false,
@@ -125,6 +152,7 @@ export const payments: Record<
   "LX-2MW9": { method: "card", status: "initiated" },
   "LX-9PD5": { method: "card", status: "failed", failureReason: "Card declined (sample)" },
   "LX-7CN1": { method: "card", status: "succeeded" },
+  "LX-6SP3": { method: "card", status: "succeeded" },
 };
 
 export const reviews: Record<string, { rating: number; title: string; body: string }> = {
@@ -141,9 +169,10 @@ export const itinerary = {
   name: "November stay",
   arrival: "2026-11-02",
   departure: "2026-11-05",
+  activityBudgetMinor: 3_000_000, // ₹30,000 for two guests
   items: [
-    { experience: "lakeside-sunrise-yoga", startsAt: "2026-11-03T07:00:00.000Z", partySize: 2, booked: "LX-4KQ7" },
-    { experience: "river-wildlife-canoe", startsAt: "2026-11-04T06:30:00.000Z", partySize: 2 },
-    { experience: "canopy-sunset-dining", startsAt: "2026-11-05T17:30:00.000Z", partySize: 2, booked: "LX-8TB2" },
+    { experience: "lakeside-sunrise-yoga", startsAt: at("2026-11-03", "07:00"), partySize: 2, booked: "LX-4KQ7" },
+    { experience: "river-wildlife-canoe", startsAt: at("2026-11-04", "06:30"), partySize: 2 },
+    { experience: "canopy-sunset-dining", startsAt: at("2026-11-05", "17:30"), partySize: 2, booked: "LX-8TB2" },
   ],
 };

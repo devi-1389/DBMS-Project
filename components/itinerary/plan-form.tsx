@@ -19,7 +19,15 @@ import { Input } from "@/components/ui/input";
 import { ROUTES } from "@/lib/navigation";
 import { planSchema, toFieldErrors } from "@/lib/validation/schemas";
 
-type PlanValues = { name: string; arrival: string; departure: string };
+type PlanValues = { name: string; arrival: string; departure: string; budget: string };
+type PlanSubmit = { name: string; arrival: string | null; departure: string | null; activityBudgetMinor: number | null };
+
+/** "15,000" or "₹15000" → 1500000 paise; blank → no budget. */
+function budgetToMinor(value: string) {
+  const cleaned = value.replace(/[₹,\s]/g, "");
+  if (!cleaned) return null;
+  return Math.round(Number(cleaned) * 100);
+}
 
 function PlanFields({
   idPrefix,
@@ -30,7 +38,7 @@ function PlanFields({
   idPrefix: string;
   initial: PlanValues;
   submitLabel: string;
-  onSubmit: (input: { name: string; arrival: string | null; departure: string | null }) => Promise<{ ok: boolean; message?: string; fieldErrors?: Record<string, string> }>;
+  onSubmit: (input: PlanSubmit) => Promise<{ ok: boolean; message?: string; fieldErrors?: Record<string, string> }>;
 }) {
   const [values, setValues] = useState(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -39,7 +47,12 @@ function PlanFields({
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    const input = { name: values.name, arrival: values.arrival || null, departure: values.departure || null };
+    const input = {
+      name: values.name,
+      arrival: values.arrival || null,
+      departure: values.departure || null,
+      activityBudgetMinor: budgetToMinor(values.budget),
+    };
     const parsed = planSchema.safeParse(input);
     if (!parsed.success) {
       setErrors(toFieldErrors(parsed.error).fieldErrors);
@@ -59,36 +72,55 @@ function PlanFields({
   });
 
   return (
-    <form onSubmit={submit} noValidate className="grid gap-4 sm:grid-cols-[1.4fr_1fr_1fr_auto] sm:items-start">
-      <FormField id={`${idPrefix}-name`} label="Plan name" error={errors.name}>
-        {(props) => <Input {...props} {...field("name")} maxLength={80} />}
-      </FormField>
-      <FormField id={`${idPrefix}-arrival`} label="Arrival" error={errors.arrival}>
-        {(props) => <Input {...props} {...field("arrival")} type="date" />}
-      </FormField>
-      <FormField id={`${idPrefix}-departure`} label="Departure" error={errors.departure}>
-        {(props) => <Input {...props} {...field("departure")} type="date" />}
-      </FormField>
-      <div className="grid gap-2 sm:pt-6">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : submitLabel}
-        </Button>
+    <form onSubmit={submit} noValidate className="@container">
+      <div className="grid gap-4 @lg:grid-cols-2 @4xl:grid-cols-[1.4fr_1fr_1fr_1fr_auto] @4xl:items-start">
+        <FormField id={`${idPrefix}-name`} label="Plan name" error={errors.name}>
+          {(props) => <Input {...props} {...field("name")} maxLength={80} />}
+        </FormField>
+        <FormField id={`${idPrefix}-arrival`} label="Arrival" error={errors.arrival}>
+          {(props) => <Input {...props} {...field("arrival")} type="date" />}
+        </FormField>
+        <FormField id={`${idPrefix}-departure`} label="Departure" error={errors.departure}>
+          {(props) => <Input {...props} {...field("departure")} type="date" />}
+        </FormField>
+        <FormField
+          id={`${idPrefix}-budget`}
+          label="Activity budget (₹)"
+          hint="For everyone in the plan. Optional."
+          error={errors.activityBudgetMinor}
+        >
+          {(props) => <Input {...props} {...field("budget")} inputMode="numeric" placeholder="e.g. 15,000" />}
+        </FormField>
+        <div className="grid gap-2 @4xl:pt-6">
+          <Button type="submit" disabled={pending}>
+            {pending ? "Saving…" : submitLabel}
+          </Button>
+        </div>
+        {message && (
+          <p role={message.ok ? "status" : "alert"} className={message.ok ? "col-span-full text-sm text-forest-700" : "col-span-full text-sm text-destructive"}>
+            {message.text}
+          </p>
+        )}
       </div>
-      {message && (
-        <p role={message.ok ? "status" : "alert"} className={message.ok ? "text-sm text-forest-700 sm:col-span-4" : "text-sm text-destructive sm:col-span-4"}>
-          {message.text}
-        </p>
-      )}
     </form>
   );
 }
 
-export function EditPlanForm({ plan }: { plan: { id: string; name: string; arrival: string | null; departure: string | null } }) {
+export function EditPlanForm({
+  plan,
+}: {
+  plan: { id: string; name: string; arrival: string | null; departure: string | null; activityBudgetMinor: number | null };
+}) {
   return (
     <PlanFields
       key={plan.id}
       idPrefix="edit-plan"
-      initial={{ name: plan.name, arrival: plan.arrival ?? "", departure: plan.departure ?? "" }}
+      initial={{
+        name: plan.name,
+        arrival: plan.arrival ?? "",
+        departure: plan.departure ?? "",
+        budget: plan.activityBudgetMinor === null ? "" : String(plan.activityBudgetMinor / 100),
+      }}
       submitLabel="Save plan"
       onSubmit={(input) => updatePlanAction(plan.id, input)}
     />
@@ -117,7 +149,7 @@ export function CreatePlanDialog({ hasPlans }: { hasPlans: boolean }) {
         </DialogHeader>
         <PlanFields
           idPrefix="new-plan"
-          initial={{ name: "My stay", arrival: "", departure: "" }}
+          initial={{ name: "My stay", arrival: "", departure: "", budget: "" }}
           submitLabel="Create plan"
           onSubmit={async (input) => {
             const result = await createPlanAction(input);

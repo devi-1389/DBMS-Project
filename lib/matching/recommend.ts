@@ -1,6 +1,9 @@
-// Explainable recommendations: hard filters first (each with a stated reason), then a
-// score made of named factors so guests can see exactly why something ranked where it
-// did. Pure: the same code ranks database records on the server and previews on the client.
+// LUXE-ECO explainable recommendations: hard filters first (each with a stated reason),
+// then a score made of named factors so guests can see exactly why something ranked
+// where it did. Sessions must also be able to run: a guide assigned and the venue and
+// equipment available (from the `slot_readiness` view). Pure: the same code ranks
+// database records on the server and previews on the client.
+import { CATEGORY_LABELS, type ExperienceCategory } from "@/lib/categories";
 import { DIFFICULTY_LABELS, DIFFICULTY_RANK } from "@/lib/difficulty";
 import { formatDate, formatPrice, formatTime, joinList, timeOfDay, toDateKey } from "@/lib/format";
 import { INTEREST_LABELS, type InterestId } from "@/lib/interests";
@@ -19,7 +22,7 @@ export type RecommendationFilters = {
   maxPricePerGuestMinor: number | null;
   /** Only sessions at these times of day; empty = any time. */
   timesOfDay: TimeOfDay[];
-  /** Only sessions with enough seats left for the party. */
+  /** Only sessions with enough seats (and shared equipment) left for the party. */
   availableOnly: boolean;
   /** Skip sessions that overlap something already planned. */
   avoidConflicts: boolean;
@@ -27,7 +30,7 @@ export type RecommendationFilters = {
 
 export type PlannedSession = { slotId: string; startsAt: string; endsAt: string };
 
-export type FactorKey = "interests" | "pace" | "budget" | "timing" | "flexibility";
+export type FactorKey = "interests" | "categories" | "pace" | "budget" | "timing" | "flexibility";
 
 export type ScoreFactor = { key: FactorKey; label: string; points: number; max: number; detail: string };
 
@@ -39,9 +42,11 @@ export type Recommendation = {
   percent: number;
   factors: ScoreFactor[];
   reasons: string[];
-  /** Sessions that pass every filter, soonest first (up to 4). */
+  /** Sessions that pass every filter and can run, soonest first. */
   sessions: ExperienceSlot[];
   fittingSessionCount: number;
+  /** What was checked for the first session: who leads it and which resources are held. */
+  availability: string | null;
 };
 
 export type ExclusionReason =
@@ -49,6 +54,7 @@ export type ExclusionReason =
   | "too-challenging"
   | "group-too-large"
   | "over-budget"
+  | "not-ready"
   | "no-fitting-session";
 
 export const EXCLUSION_LABELS: Record<ExclusionReason, string> = {
@@ -56,6 +62,7 @@ export const EXCLUSION_LABELS: Record<ExclusionReason, string> = {
   "too-challenging": "are harder than your chosen pace",
   "group-too-large": "can't take a group of this size",
   "over-budget": "cost more than your budget",
+  "not-ready": "have no session with a guide, venue and equipment free for your group",
   "no-fitting-session": "have no session that fits your dates, party size or schedule",
 };
 
@@ -64,30 +71,57 @@ export type RecommendationResult = {
   excluded: Partial<Record<ExclusionReason, number>>;
 };
 
-const seatsLeft = (slot: ExperienceSlot) => slot.capacity - slot.booked;
+/** Seats a new party can use: seats left, capped by shared equipment pools when known. */
+export function bookableSeats(slot: ExperienceSlot) {
+  return slot.readiness?.bookableSeats ?? slot.capacity - slot.booked;
+}
+
+/** Guide or host assigned and every per-session resource held. Placeholder sessions count as ready. */
+export function isReady(slot: ExperienceSlot) {
+  return slot.readiness?.ready ?? true;
+}
+
+/** "Mara Ellis leads · Two-person canoe and Wildlife binoculars confirmed". */
+export function describeAvailability(slot: ExperienceSlot) {
+  const readiness = slot.readiness;
+  if (!readiness?.ready) return null;
+  const parts = [`${joinList(readiness.staff)} ${readiness.staff.length > 1 ? "lead" : "leads"}`];
+  if (readiness.resources.length) parts.push(`${joinList(readiness.resources)} confirmed`);
+  if (readiness.limitedBy) parts.push(`${readiness.bookableSeats} places left (${readiness.limitedBy} is shared)`);
+  return parts.join(" · ");
+}
 
 function weightOf(preferences: GuestPreferences, interest: InterestId) {
   return preferences.interestWeights[interest] ?? DEFAULT_INTEREST_WEIGHT;
 }
 
-function fittingSessions(
-  slots: ExperienceSlot[],
-  filters: RecommendationFilters,
-  planned: PlannedSession[],
-  now: Date,
-) {
-  return slots
+function fittingSessions(slots: ExperienceSlot[], filters: RecommendationFilters, planned: PlannedSession[], now: Date) {
+  let blockedByReadiness = 0;
+  const sessions = slots
     .filter((slot) => {
       if (Date.parse(slot.startsAt) <= now.getTime()) return false;
       const day = toDateKey(slot.startsAt);
       if (day < filters.from || day > filters.to) return false;
-      if (filters.availableOnly && seatsLeft(slot) < filters.partySize) return false;
       if (filters.timesOfDay.length && !filters.timesOfDay.includes(timeOfDay(slot.startsAt))) return false;
       if (planned.some((item) => item.slotId === slot.id)) return false;
       if (filters.avoidConflicts && planned.some((item) => overlaps(item, slot))) return false;
+      // No guide assigned, or its venue, boats or vehicle aren't held: it can't run.
+      if (!isReady(slot)) {
+        blockedByReadiness++;
+        return false;
+      }
+      if (filters.availableOnly) {
+        if (slot.capacity - slot.booked < filters.partySize) return false;
+        // Seats are free, but a shared equipment pool (kayaks, bicycles…) is short.
+        if (bookableSeats(slot) < filters.partySize) {
+          blockedByReadiness++;
+          return false;
+        }
+      }
       return true;
     })
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  return { sessions, blockedByReadiness };
 }
 
 function scoreFactors(
@@ -113,6 +147,20 @@ function scoreFactors(
       detail: shared.length
         ? joinList(shared.map((interest) => INTEREST_LABELS[interest]))
         : "None of your interests",
+    });
+  }
+
+  // Favourite categories, e.g. "nature + adventure + luxury".
+  if (preferences.categories.length) {
+    const favourite = preferences.categories.includes(experience.category);
+    factors.push({
+      key: "categories",
+      label: "Favourite categories",
+      points: favourite ? 3 : 0,
+      max: 3,
+      detail: favourite
+        ? `${CATEGORY_LABELS[experience.category]}, one of your favourites`
+        : `Not in your favourites (${joinList(preferences.categories.map((category) => CATEGORY_LABELS[category].toLowerCase()))})`,
     });
   }
 
@@ -224,24 +272,26 @@ export function recommendExperiences({
       exclude("over-budget");
       continue;
     }
-    const sessions = fittingSessions(slotsBySlug.get(experience.slug) ?? [], filters, planned, now);
+    const { sessions, blockedByReadiness } = fittingSessions(slotsBySlug.get(experience.slug) ?? [], filters, planned, now);
     if (!sessions.length) {
-      exclude("no-fitting-session");
+      exclude(blockedByReadiness ? "not-ready" : "no-fitting-session");
       continue;
     }
 
     const factors = scoreFactors(experience, sessions, preferences);
     const score = factors.reduce((sum, factor) => sum + factor.points, 0);
     const maxScore = factors.reduce((sum, factor) => sum + factor.max, 0);
+    const availability = describeAvailability(sessions[0]);
     recommendations.push({
       experience,
       score,
       maxScore,
       percent: maxScore ? Math.round((score / maxScore) * 100) : 0,
       factors,
-      reasons: reasonsFrom(factors),
-      sessions: sessions.slice(0, 4),
+      reasons: [...reasonsFrom(factors), ...(availability ? [availability] : [])],
+      sessions,
       fittingSessionCount: sessions.length,
+      availability,
     });
   }
 
@@ -257,41 +307,102 @@ export function recommendExperiences({
   return { recommendations: recommendations.slice(0, limit), excluded };
 }
 
-export type SuggestedSession = { recommendation: Recommendation; slot: ExperienceSlot };
+export type SuggestedSession = { recommendation: Recommendation; slot: ExperienceSlot; costMinor: number };
+
+export type SuggestedItinerary = {
+  sessions: SuggestedSession[];
+  /** Estimated cost of the suggested sessions for the whole party. */
+  totalMinor: number;
+  /** Budget left after the plan's existing items and these suggestions; null = no budget. */
+  remainingMinor: number | null;
+  /** Good matches left out because they'd go over the budget. */
+  skippedForBudget: number;
+};
 
 /**
- * A suggested itinerary: the best recommendations placed on non-overlapping sessions,
- * at most `perDay` per day. It's only a suggestion; nothing is saved or reserved.
+ * A suggested day-by-day itinerary (the brief's "Day 1: spa + private dinner…"): the best
+ * recommendations placed on sessions that can run, spread across the stay's days, at most
+ * `perDay` a day, never overlapping each other or the plan, preferring the guest's times of
+ * day, and within the remaining activity budget. Matches under `minPercent` are skipped.
+ * Nothing is saved or reserved.
  */
 export function suggestItinerary({
   recommendations,
   planned = [],
   perDay = 2,
   limit = 6,
+  days,
+  partySize = 1,
+  budgetMinor = null,
+  preferredTimes = [],
+  minPercent = 50,
 }: {
   recommendations: Recommendation[];
-  planned?: PlannedSession[];
+  planned?: (PlannedSession & { category?: ExperienceCategory })[];
   perDay?: number;
   limit?: number;
-}): SuggestedSession[] {
+  /** Resort-local date keys to fill; omit to allow any day the sessions fall on. */
+  days?: string[];
+  partySize?: number;
+  /** Remaining activity budget for the whole party; null = no budget. */
+  budgetMinor?: number | null;
+  preferredTimes?: TimeOfDay[];
+  /** Only suggest reasonable matches; a weak match isn't worth spending budget on. */
+  minPercent?: number;
+}): SuggestedItinerary {
   const chosen: SuggestedSession[] = [];
   const perDayCount = new Map<string, number>();
-  for (const item of planned) {
-    const day = toDateKey(item.startsAt);
+  const categoriesByDay = new Map<string, Set<ExperienceCategory>>();
+  const note = (day: string, category?: ExperienceCategory) => {
     perDayCount.set(day, (perDayCount.get(day) ?? 0) + 1);
-  }
+    if (category) categoriesByDay.set(day, new Set([...(categoriesByDay.get(day) ?? []), category]));
+  };
+  for (const item of planned) note(toDateKey(item.startsAt), item.category);
 
+  let remaining = budgetMinor;
+  let skippedForBudget = 0;
   for (const recommendation of recommendations) {
     if (chosen.length >= limit) break;
-    const slot = recommendation.sessions.find((candidate) => {
+    if (recommendation.percent < minPercent) continue;
+    const { experience } = recommendation;
+    const costMinor = experience.priceFromMinor * partySize;
+    if (remaining !== null && costMinor > remaining) {
+      skippedForBudget++;
+      continue;
+    }
+    const taken = [...planned, ...chosen.map((item) => item.slot)];
+    const candidates = recommendation.sessions.filter((candidate) => {
       const day = toDateKey(candidate.startsAt);
+      if (days && !days.includes(day)) return false;
       if ((perDayCount.get(day) ?? 0) >= perDay) return false;
-      return ![...planned, ...chosen.map((item) => item.slot)].some((other) => overlaps(other, candidate));
+      if (bookableSeats(candidate) < partySize || !isReady(candidate)) return false;
+      return !taken.some((other) => overlaps(other, candidate));
     });
-    if (!slot) continue;
-    chosen.push({ recommendation, slot });
-    const day = toDateKey(slot.startsAt);
-    perDayCount.set(day, (perDayCount.get(day) ?? 0) + 1);
+    if (!candidates.length) continue;
+
+    // Spread across days first, then vary categories within a day, then preferred times.
+    const rank = (slot: ExperienceSlot) => {
+      const day = toDateKey(slot.startsAt);
+      return [
+        perDayCount.get(day) ?? 0,
+        categoriesByDay.get(day)?.has(experience.category) ? 1 : 0,
+        preferredTimes.length && !preferredTimes.includes(timeOfDay(slot.startsAt)) ? 1 : 0,
+      ];
+    };
+    const slot = candidates
+      .map((candidate) => ({ candidate, key: rank(candidate) }))
+      .sort((a, b) => a.key[0] - b.key[0] || a.key[1] - b.key[1] || a.key[2] - b.key[2] || a.candidate.startsAt.localeCompare(b.candidate.startsAt))[0]
+      .candidate;
+
+    chosen.push({ recommendation, slot, costMinor });
+    note(toDateKey(slot.startsAt), experience.category);
+    if (remaining !== null) remaining -= costMinor;
   }
-  return chosen.sort((a, b) => a.slot.startsAt.localeCompare(b.slot.startsAt));
+
+  return {
+    sessions: chosen.sort((a, b) => a.slot.startsAt.localeCompare(b.slot.startsAt)),
+    totalMinor: chosen.reduce((sum, item) => sum + item.costMinor, 0),
+    remainingMinor: remaining,
+    skippedForBudget,
+  };
 }

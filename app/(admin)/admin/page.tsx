@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Viewer } from "@/lib/auth/types";
 import { getDb } from "@/lib/db";
+import { addDays, resortDayWindow, toDateKey } from "@/lib/format";
 import { getAdminConsoleData } from "@/lib/dal/admin";
 import { ROUTES } from "@/lib/navigation";
 
@@ -34,9 +35,8 @@ export default function AdminPage() {
 }
 
 async function AdminContent({ viewer }: { viewer: Viewer }) {
-  const from = new Date();
-  from.setUTCHours(0, 0, 0, 0);
-  const to = new Date(from.getTime() + WINDOW_DAYS * 86_400_000);
+  const today = toDateKey(new Date().toISOString());
+  const { from, to } = resortDayWindow(today, addDays(today, WINDOW_DAYS - 1));
   const data = await getAdminConsoleData(getDb(), viewer, { from, to });
   return <AdminConsole {...data} currentUserId={viewer.userId} windowDays={WINDOW_DAYS} />;
 }

@@ -9,6 +9,7 @@ import {
   experiences,
   experienceSlots,
   interests,
+  slotReadiness,
 } from "@/lib/db/schema";
 import type { Db } from "@/lib/db/types";
 import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
@@ -17,7 +18,10 @@ import { toExperienceSummary, toSlot } from "./mappers";
 
 export type Catalogue = { experiences: ExperienceSummary[]; slots: ExperienceSlot[] };
 
-/** Published experiences and their scheduled sessions starting within [from, to). */
+/**
+ * Published experiences and their scheduled sessions starting within [from, to), each
+ * with its readiness (guide, venue and equipment availability from `slot_readiness`).
+ */
 export async function listCatalogue(db: Db, window: { from: Date; to: Date }): Promise<Catalogue> {
   const rows = await db
     .select({ experience: experiences, categorySlug: experienceCategories.slug })
@@ -46,8 +50,20 @@ export async function listCatalogue(db: Db, window: { from: Date; to: Date }): P
       endsAt: experienceSlots.endsAt,
       capacity: experienceSlots.capacity,
       seatsBooked: experienceSlots.seatsBooked,
+      readiness: {
+        slotId: slotReadiness.slotId,
+        staffAssigned: slotReadiness.staffAssigned,
+        staffNames: slotReadiness.staffNames,
+        resourcesConfirmed: slotReadiness.resourcesConfirmed,
+        resourcesMissing: slotReadiness.resourcesMissing,
+        guestLimit: slotReadiness.guestLimit,
+        limitingResource: slotReadiness.limitingResource,
+        ready: slotReadiness.ready,
+        bookableSeats: slotReadiness.bookableSeats,
+      },
     })
     .from(experienceSlots)
+    .leftJoin(slotReadiness, eq(slotReadiness.slotId, experienceSlots.id))
     .where(
       and(
         inArray(experienceSlots.experienceId, ids),
@@ -68,7 +84,7 @@ export async function listCatalogue(db: Db, window: { from: Date; to: Date }): P
         highlightRows.filter((item) => item.experienceId === row.experience.id).map((item) => item.text),
       ),
     ),
-    slots: slotRows.map((slot) => toSlot(slot, slugById.get(slot.experienceId)!)),
+    slots: slotRows.map((slot) => toSlot(slot, slugById.get(slot.experienceId)!, slot.readiness)),
   };
 }
 

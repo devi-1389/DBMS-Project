@@ -4,7 +4,7 @@
 /* shadcn/ui components use `dark:` for an opt-in `.dark` class, not the OS setting. */
 @custom-variant dark (&:is(.dark *));
 
-/* LUXE-ECO brand palette: forest green, warm ivory, sage and champagne gold. */
+/* SOLACE brand palette: forest green, warm ivory, sage and champagne gold. */
 @theme {
   --color-forest-950: #0b1711;
   --color-forest-900: #122319;

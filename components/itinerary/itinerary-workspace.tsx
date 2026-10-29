@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarPlus, CircleCheck, Lightbulb, Route, Ticket, TriangleAlert, Users } from "lucide-react";
+import { CalendarPlus, CircleCheck, Lightbulb, Route, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
 
 import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 import { EmptyState } from "@/components/common/empty-state";
@@ -9,9 +9,9 @@ import { CreatePlanDialog, EditPlanForm } from "@/components/itinerary/plan-form
 import { DeletePlanButton, PlanItemControls } from "@/components/itinerary/plan-item-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatDateKey, formatPrice, formatTimeRange, toDateKey } from "@/lib/format";
+import { formatAmount, formatDate, formatDateKey, formatPrice, formatTimeRange, toDateKey } from "@/lib/format";
 import { conflictMap, isOutsideStay, itineraryTotal, planDays } from "@/lib/itinerary";
-import type { SuggestedSession } from "@/lib/matching/recommend";
+import type { SuggestedItinerary } from "@/lib/matching/recommend";
 import { bookingHref, experienceHref, experiencesOnDateHref, ROUTES } from "@/lib/navigation";
 import type { BookingSummary } from "@/lib/types/booking";
 import type { ItineraryPlan, ItineraryPlanSummary, PlannedItem } from "@/lib/types/guest";
@@ -27,7 +27,7 @@ export function ItineraryWorkspace({
   plans: ItineraryPlanSummary[];
   plan: ItineraryPlan | null;
   bookings: BookingSummary[];
-  suggestions: SuggestedSession[];
+  suggestions: SuggestedItinerary | null;
   partySize: number;
 }) {
   if (!plan) {
@@ -49,7 +49,13 @@ export function ItineraryWorkspace({
   const days = planDays(plan, plan.items);
   const outside = plan.items.filter((item) => isOutsideStay(item.startsAt, plan.arrival, plan.departure));
   const inStay = plan.items.filter((item) => !outside.includes(item));
-  const currency = plan.items[0]?.currency;
+  const currency = plan.currency;
+  const total = itineraryTotal(plan.items);
+  const budget = plan.activityBudgetMinor;
+  const overBudget = budget !== null && total > budget;
+  const suggestedDays = suggestions
+    ? [...new Set(suggestions.sessions.map((item) => toDateKey(item.slot.startsAt)))].sort()
+    : [];
 
   return (
     <div className="space-y-8">
@@ -154,37 +160,66 @@ export function ItineraryWorkspace({
           <section aria-labelledby="suggestions-title" className="rounded-2xl border bg-ivory-200/50 p-6">
             <h3 id="suggestions-title" className="flex items-center gap-2 font-display text-2xl font-semibold">
               <Lightbulb className="size-5 text-gold-600" aria-hidden="true" />
-              Suggested for this stay
+              Suggested days for this stay
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Ranked from your preferences, avoiding clashes with your plan. Not in your plan until you add them.
+              LUXE-ECO picks your best matches, spreads them across your days at your preferred times, keeps them
+              {budget !== null ? " within your activity budget" : ""} and only uses sessions with a guide, venue and
+              equipment free. Not in your plan until you add them.
             </p>
-            {suggestions.length === 0 ? (
+            {!suggestions || suggestions.sessions.length === 0 ? (
               <p className="mt-4 text-sm text-muted-foreground">
-                {plan.arrival && plan.departure
-                  ? "No further sessions fit your stay and preferences."
-                  : "Add arrival and departure dates to get suggestions for your stay."}
+                {!plan.arrival || !plan.departure
+                  ? "Add arrival and departure dates to get a day-by-day suggestion."
+                  : suggestions?.skippedForBudget
+                    ? "Your remaining activity budget doesn't cover any more matching sessions."
+                    : "No further sessions fit your stay and preferences."}
               </p>
             ) : (
-              <ul className="mt-4 divide-y rounded-xl border bg-card">
-                {suggestions.map(({ recommendation, slot }) => (
-                  <li key={slot.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0">
-                      <Link
-                        href={experienceHref(recommendation.experience.slug)}
-                        className="font-semibold hover:underline hover:underline-offset-4"
-                      >
-                        {recommendation.experience.title}
-                      </Link>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(slot.startsAt)} · {formatTimeRange(slot.startsAt, slot.endsAt)} · {recommendation.percent}% match
+              <>
+                <ol className="mt-4 space-y-4" aria-label="Suggested days">
+                  {suggestedDays.map((day) => (
+                    <li key={day}>
+                      <p className="text-sm font-semibold">
+                        Day {days.indexOf(day) + 1} · {formatDateKey(day, "long")}
                       </p>
-                      <p className="text-xs text-muted-foreground">{recommendation.reasons[0]}</p>
-                    </div>
-                    <AddToPlanButton slotId={slot.id} partySize={partySize} planId={plan.id} />
-                  </li>
-                ))}
-              </ul>
+                      <ul className="mt-2 divide-y rounded-xl border bg-card">
+                        {suggestions.sessions
+                          .filter((item) => toDateKey(item.slot.startsAt) === day)
+                          .map(({ recommendation, slot, costMinor }) => (
+                            <li key={slot.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                              <div className="min-w-0">
+                                <Link
+                                  href={experienceHref(recommendation.experience.slug)}
+                                  className="font-semibold hover:underline hover:underline-offset-4"
+                                >
+                                  {recommendation.experience.title}
+                                </Link>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatTimeRange(slot.startsAt, slot.endsAt)} · {recommendation.percent}% match ·{" "}
+                                  {formatPrice(costMinor, recommendation.experience.currency)} for {partySize}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{recommendation.reasons[0]}</p>
+                                {recommendation.availability && (
+                                  <p className="text-xs text-forest-700">{recommendation.availability}</p>
+                                )}
+                              </div>
+                              <AddToPlanButton slotId={slot.id} partySize={partySize} planId={plan.id} />
+                            </li>
+                          ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-4 text-sm text-muted-foreground">
+                  Suggested total {formatAmount(suggestions.totalMinor, currency)}
+                  {suggestions.remainingMinor !== null &&
+                    ` · ${formatAmount(Math.max(suggestions.remainingMinor, 0), currency)} of your budget would be left`}
+                  {suggestions.skippedForBudget > 0 &&
+                    ` · ${suggestions.skippedForBudget} more ${suggestions.skippedForBudget === 1 ? "match" : "matches"} left out to stay within budget`}
+                  .
+                </p>
+              </>
             )}
           </section>
         </div>
@@ -205,9 +240,34 @@ export function ItineraryWorkspace({
               </div>
               <div className="flex items-baseline justify-between border-t pt-4">
                 <dt className="font-semibold">Estimated total</dt>
-                <dd className="font-display text-3xl font-semibold">{formatPrice(itineraryTotal(plan.items), currency)}</dd>
+                <dd className="font-display text-3xl font-semibold">{formatAmount(total, currency)}</dd>
               </div>
+              {budget !== null && (
+                <div className="flex items-baseline justify-between">
+                  <dt className="flex items-center gap-1.5 text-muted-foreground">
+                    <Wallet className="size-4" aria-hidden="true" />
+                    Activity budget
+                  </dt>
+                  <dd className={cn("font-semibold", overBudget && "text-destructive")}>
+                    {overBudget
+                      ? `${formatAmount(total - budget, currency)} over ${formatAmount(budget, currency)}`
+                      : `${formatAmount(budget - total, currency)} left of ${formatAmount(budget, currency)}`}
+                  </dd>
+                </div>
+              )}
             </dl>
+            {budget !== null && (
+              <div
+                aria-hidden="true"
+                className="mt-3 h-2 overflow-hidden rounded-full bg-muted"
+                title={`${Math.round((total / Math.max(budget, 1)) * 100)}% of budget planned`}
+              >
+                <div
+                  className={cn("h-full rounded-full", overBudget ? "bg-destructive" : "bg-forest-600")}
+                  style={{ width: `${Math.min(100, (total / Math.max(budget, 1)) * 100)}%` }}
+                />
+              </div>
+            )}
             <p className="mt-4 text-xs text-muted-foreground">
               Estimates only. Planned sessions aren&apos;t reserved and don&apos;t hold seats.
             </p>

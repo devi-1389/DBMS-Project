@@ -74,6 +74,29 @@ describe("plan schema", () => {
   });
 });
 
+describe("SOLACE additions", () => {
+  it("accepts favourite categories and rejects unknown ones", () => {
+    expect(preferencesSchema.parse({ ...validPreferences, categories: ["nature", "adventure", "luxury"] }).categories).toEqual([
+      "nature",
+      "adventure",
+      "luxury",
+    ]);
+    expect(preferencesSchema.parse(validPreferences).categories).toEqual([]);
+    expect(preferencesSchema.safeParse({ ...validPreferences, categories: ["casino"] }).success).toBe(false);
+  });
+
+  it("validates a plan's activity budget in paise", () => {
+    const plan = { name: "Long weekend", arrival: "2026-11-02", departure: "2026-11-04" };
+    expect(planSchema.parse({ ...plan, activityBudgetMinor: 1_500_000 }).activityBudgetMinor).toBe(1_500_000);
+    expect(planSchema.parse(plan).activityBudgetMinor).toBeNull();
+    const negative = planSchema.safeParse({ ...plan, activityBudgetMinor: -100 });
+    expect(negative.success || toFieldErrors(negative.error).fieldErrors.activityBudgetMinor).toBe("Budget can't be negative.");
+    const huge = planSchema.safeParse({ ...plan, activityBudgetMinor: 60_000_000 });
+    expect(huge.success || toFieldErrors(huge.error).fieldErrors.activityBudgetMinor).toBe("Budget can be at most ₹5,00,000.");
+    expect(planSchema.safeParse({ ...plan, activityBudgetMinor: Number.NaN }).success).toBe(false);
+  });
+});
+
 describe("session and role schemas", () => {
   it("requires a real slug, ISO time and sane party size", () => {
     const base = { experienceSlug: "lakeside-sunrise-yoga", startsAt: "2026-11-03T07:00:00.000Z", partySize: 2 };

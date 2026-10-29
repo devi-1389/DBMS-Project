@@ -1,6 +1,6 @@
 // Recommendation filters <-> URL search params, with defaults from the guest's
 // preferences and plan. Invalid values fall back to defaults rather than erroring.
-import { addDays, daysBetween, isDateKey, toDateKey } from "@/lib/format";
+import { addDays, daysBetween, isDateKey, resortDayWindow, toDateKey } from "@/lib/format";
 import type { RecommendationFilters } from "@/lib/matching/recommend";
 import { BUDGET_OPTIONS } from "@/lib/preferences";
 import type { GuestPreferences, TimeOfDay } from "@/lib/types/guest";
@@ -60,7 +60,7 @@ export function parseFilters(params: Params, defaults: RecommendationFilters): R
   return filters;
 }
 
-/** Inclusive date keys → half-open time window for queries. */
+/** Inclusive resort-local date keys → half-open time window for queries. */
 export function filterWindow(filters: RecommendationFilters) {
-  return { from: new Date(`${filters.from}T00:00:00.000Z`), to: new Date(`${addDays(filters.to, 1)}T00:00:00.000Z`) };
+  return resortDayWindow(filters.from, filters.to);
 }
