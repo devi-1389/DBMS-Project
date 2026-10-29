@@ -100,7 +100,7 @@ export function ExperienceDetailsDialog({
 
           <p className="flex items-start gap-2 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">
             <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            Online booking opens with guest accounts. Details shown are a preview.
+            Sign in to book online and pay at the resort. Sessions and prices are shown on the experience page.
           </p>
         </div>
       </DialogContent>

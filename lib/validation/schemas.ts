@@ -88,6 +88,20 @@ export const addSessionSchema = z.strictObject({
 });
 
 export const updateItemSchema = z.strictObject({ itemId: z.uuid("Unknown plan item."), partySize });
+
+const bookingReference = z.string().regex(/^LX-[A-Z0-9]{4,10}$/, "Unknown booking.");
+
+/** Book a session. Prices and seat counts always come from the database. */
+export const bookSessionSchema = z.strictObject({
+  slotId: z.uuid("Unknown session."),
+  partySize,
+  /** Generated once per booking attempt in the browser, so a retry can't book twice. */
+  idempotencyKey: z.uuid("Please try again."),
+});
+
+export const bookingReferenceSchema = bookingReference;
+
+export const changeGuestsSchema = z.strictObject({ reference: bookingReference, partySize });
 export const idSchema = z.uuid("Unknown item.");
 
 export const roleChangeSchema = z.strictObject({

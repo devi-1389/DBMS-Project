@@ -23,7 +23,7 @@ export function MyBookingsView({ bookings }: { bookings: BookingSummary[] }) {
       <EmptyState
         icon={Ticket}
         title="You don't have any bookings yet"
-        description="Online booking isn't open yet. Sessions you plan in your itinerary aren't bookings and don't appear here."
+        description="Book a session from any experience page or from your itinerary. Planned sessions aren't bookings and don't appear here."
       >
         <Button asChild>
           <Link href={ROUTES.recommendations}>See recommendations</Link>
