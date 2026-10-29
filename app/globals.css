@@ -1,26 +1,171 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* shadcn/ui components use `dark:` for an opt-in `.dark` class, not the OS setting. */
+@custom-variant dark (&:is(.dark *));
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* LUXE-ECO brand palette: forest green, warm ivory, sage and champagne gold. */
+@theme {
+  --color-forest-950: #0b1711;
+  --color-forest-900: #122319;
+  --color-forest-800: #1a3226;
+  --color-forest-700: #244232;
+  --color-forest-600: #305643;
+  --color-forest-500: #3f6b55;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-sage-100: #e6eadd;
+  --color-sage-200: #d3dbc6;
+  --color-sage-300: #bac6aa;
+  --color-sage-400: #9fae8d;
+  --color-sage-500: #869774;
+  --color-sage-600: #6b7b5c;
+
+  --color-ivory-50: #fdfbf6;
+  --color-ivory-100: #faf6ee;
+  --color-ivory-200: #f4eddf;
+  --color-ivory-300: #eadfca;
+
+  --color-gold-200: #efe2c6;
+  --color-gold-300: #e3cda0;
+  --color-gold-400: #d4b77f;
+  --color-gold-500: #c3a064;
+  --color-gold-600: #a6844c;
+  --color-gold-700: #7a5f33;
+
+  --animate-hero-zoom: hero-zoom 18s cubic-bezier(0.2, 0.6, 0.2, 1) both;
+  --animate-fade-up: fade-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-scroll-cue: scroll-cue 2.4s ease-in-out infinite;
+
+  @keyframes hero-zoom {
+    from {
+      transform: scale(1.1);
+    }
+    to {
+      transform: scale(1);
+    }
+  }
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes scroll-cue {
+    0% {
+      transform: scaleY(0);
+      transform-origin: top;
+    }
+    50% {
+      transform: scaleY(1);
+      transform-origin: top;
+    }
+    51% {
+      transform-origin: bottom;
+    }
+    100% {
+      transform: scaleY(0);
+      transform-origin: bottom;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cormorant), ui-serif, Georgia, serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+/* Semantic tokens used by shadcn/ui. Light brand theme only; dark mode is not designed yet. */
+:root {
+  --radius: 0.75rem;
+  --background: var(--color-ivory-100);
+  --foreground: var(--color-forest-900);
+  --card: var(--color-ivory-50);
+  --card-foreground: var(--color-forest-900);
+  --popover: var(--color-ivory-50);
+  --popover-foreground: var(--color-forest-900);
+  --primary: var(--color-forest-800);
+  --primary-foreground: var(--color-ivory-50);
+  --secondary: var(--color-sage-100);
+  --secondary-foreground: var(--color-forest-800);
+  --muted: var(--color-ivory-200);
+  --muted-foreground: #54665a;
+  --accent: var(--color-gold-400);
+  --accent-foreground: var(--color-forest-950);
+  --destructive: #b4432f;
+  --border: #e4dbc8;
+  --input: #e4dbc8;
+  --ring: var(--color-gold-600);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+}
+
+/* Small uppercase label above section titles. */
+@utility eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* Scroll-linked fade-up. CSS only, so content stays visible without JS or support. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 28%;
+    }
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
