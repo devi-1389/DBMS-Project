@@ -1,16 +1,21 @@
-import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { LoginForm } from "@/components/auth/login-form";
 import { Logo } from "@/components/brand/logo";
-import { PreviewNotice } from "@/components/common/preview-notice";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ROUTES } from "@/lib/navigation";
 
-export const metadata: Metadata = { title: "Sign in" };
-
-export default function LoginPage() {
+/** Split-screen layout shared by sign-in and sign-up. */
+export function AuthShell({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="grid w-full lg:grid-cols-[1.05fr_1fr]">
       <div className="relative isolate hidden overflow-hidden bg-forest-950 text-ivory-50 lg:flex lg:flex-col lg:justify-between lg:p-12">
@@ -22,12 +27,15 @@ export default function LoginPage() {
           className="-z-20 object-cover"
           preload
         />
-        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-t from-forest-950/90 via-forest-950/30 to-forest-950/60" />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 bg-gradient-to-t from-forest-950/90 via-forest-950/30 to-forest-950/60"
+        />
         <Logo />
         <div className="max-w-md">
           <p className="eyebrow text-gold-300">Guest accounts</p>
           <p className="mt-4 font-display text-4xl leading-tight">
-            Save what moves you, plan your days and book in a few taps.
+            Save what moves you, plan your days and see every booking in one place.
           </p>
         </div>
       </div>
@@ -47,16 +55,21 @@ export default function LoginPage() {
         </div>
 
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-12">
-          <h1 className="font-display text-4xl font-medium sm:text-5xl">Welcome back</h1>
-          <p className="mt-3 text-muted-foreground">Sign in or create an account to keep your plans with you.</p>
-          <PreviewNotice className="mt-6">
-            Authentication isn&apos;t connected. These forms check your input but don&apos;t sign you in.
-          </PreviewNotice>
-          <div className="mt-8">
-            <LoginForm />
-          </div>
+          <h1 className="font-display text-4xl font-medium sm:text-5xl">{title}</h1>
+          <p className="mt-3 text-muted-foreground">{description}</p>
+          <div className="mt-8">{children}</div>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function AuthFormSkeleton() {
+  return (
+    <div className="space-y-4" role="status" aria-label="Loading sign-in">
+      <Skeleton className="h-11 w-full rounded-lg" />
+      <Skeleton className="h-11 w-full rounded-lg" />
+      <Skeleton className="h-11 w-full rounded-full" />
     </div>
   );
 }

@@ -1,8 +1,10 @@
 # LUXE-ECO Database Design
 
-Status: schema, migrations, seed and checks implemented (Phase 4). The app does **not**
-read from or write to the database yet: pages still use `lib/placeholder/catalogue.ts`
-until the data-access layer lands in Phase 5. Diagrams: [`ERD.md`](./ERD.md).
+Status: schema, migrations, seed and checks implemented (Phase 4). Since Phases 3 and 5,
+the guest, staff and admin areas use it through the `server-only` DAL in `lib/dal/`
+(accounts, roles, preferences, itinerary plans, bookings, schedules); see
+[`AUTHENTICATION.md`](./AUTHENTICATION.md). The public catalogue pages still read
+`lib/placeholder/catalogue.ts`. Diagrams: [`ERD.md`](./ERD.md).
 Example queries: [`../sql/queries.sql`](../sql/queries.sql).
 
 ## 1. Technology choices
@@ -50,7 +52,7 @@ don't touch the database never need credentials.
 |--------|-------|-----------------------|
 | Identity | `users` | Anyone who can sign in. Unique `lower(email)`; `role` (guest/staff/admin) is the source of truth for authorization. |
 | | `auth_identities` | Authentication-provider IDs (Clerk). Unique `(provider, provider_user_id)` and `(user_id, provider)`. |
-| | `guest_profiles` | Guest details, 1:1 with `users`. Name length, phone format, birth-date checks. |
+| | `guest_profiles` | Guest details, 1:1 with `users`. Name length, phone format, birth-date checks. Last name may be empty (migration `0002`). |
 | | `staff_members` | Staff, optionally linked to a user account (`user_id` unique, nullable). `is_active` for soft deactivation. |
 | Preferences | `interests` | Interest tags shared by guests and experiences. |
 | | `guest_preferences` | 1:1 scalar matching inputs: max difficulty, budget per guest (NULL = no limit), usual group size (1–12), step-free need, notes (≤ 500). |
@@ -270,6 +272,7 @@ TEST_DATABASE_URL=… npm run db:test:concurrency   # parallel booking race (psq
 npm run db:generate               # after editing lib/db/schema
 npm run db:check                  # migration consistency
 npm run db:studio                 # browse the database
+npm run db:set-role -- you@example.com admin   # bootstrap the first admin (account must exist)
 ```
 
 The seed and migrate scripts refuse to run when `NODE_ENV` or `VERCEL_ENV` is
@@ -278,14 +281,14 @@ The scripts never print connection strings.
 
 ## 11. Limitations and next steps
 
-- **No app integration yet.** No page reads the database; `lib/db/index.ts` is unused
-  until Phase 5.
+- **Partial app integration.** The guest, staff and admin areas read and write through
+  `lib/dal/`. The public catalogue and booking creation (Phase 6) don't yet.
 - **Not run against Neon.** `db:migrate` and `db:seed` (Neon WebSocket driver) haven't run
   against a live Neon database because no credentials exist here. The same migrations,
   seed, checks and queries were verified on PostgreSQL 16 (via `pg`) and PostgreSQL 18
   (PGlite).
-- **Authorization is application-level** (Phase 3). Row-level security is a possible later
-  hardening step.
+- **Authorization is application-level** (Phase 3): `users.role` plus owner-scoped DAL
+  queries. Row-level security is a possible later hardening step.
 - **Resort timezone and currency** are still placeholders (UTC / USD).
 - Per-guest requirements are whole units per guest; ratios (one canoe per two guests) would
   need a `guests_per_unit` column.

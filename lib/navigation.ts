@@ -15,9 +15,12 @@ export const ROUTES = {
   preferences: "/preferences",
   itinerary: "/itinerary",
   dashboard: "/dashboard",
+  recommendations: "/recommendations",
   myBookings: "/my-bookings",
+  staff: "/staff",
   admin: "/admin",
   login: "/login",
+  signUp: "/sign-up",
 } as const;
 
 export const primaryNav = [
@@ -29,15 +32,20 @@ export const primaryNav = [
 
 export const guestNav = [
   { label: "Dashboard", href: ROUTES.dashboard, icon: "dashboard" },
-  { label: "My bookings", href: ROUTES.myBookings, icon: "bookings" },
+  { label: "Recommendations", href: ROUTES.recommendations, icon: "recommendations" },
   { label: "Itinerary", href: ROUTES.itinerary, icon: "itinerary" },
   { label: "Preferences", href: ROUTES.preferences, icon: "preferences" },
+  { label: "My bookings", href: ROUTES.myBookings, icon: "bookings" },
 ] as const;
 
 export type GuestNavIcon = (typeof guestNav)[number]["icon"];
 
 export function categoryHref(category: ExperienceCategory) {
   return `${ROUTES.experiences}?category=${category}`;
+}
+
+export function bookingHref(reference: string) {
+  return `${ROUTES.myBookings}/${encodeURIComponent(reference)}`;
 }
 
 export function experienceHref(slug: string) {

@@ -1,11 +1,13 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
 // Relative imports only: drizzle-kit loads this file outside Next.js, without the `@/` alias.
+import type { UserRole } from "../../auth/roles";
 import { DIFFICULTIES } from "../../difficulty";
 import type { BookingStatus } from "../../types/booking";
 import type { TimeOfDay } from "../../types/guest";
 
-export const userRole = pgEnum("user_role", ["guest", "staff", "admin"]);
+const USER_ROLES = ["guest", "staff", "admin"] as const satisfies readonly UserRole[];
+export const userRole = pgEnum("user_role", USER_ROLES);
 export const authProvider = pgEnum("auth_provider", ["clerk"]);
 
 /** Same values as the app's Difficulty type. */

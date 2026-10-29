@@ -18,10 +18,10 @@ Read both before starting work, and update the status file at the end of every p
 - Vercel deployment
 
 Installed so far: Next.js, React, Tailwind, ESLint, TypeScript, shadcn/ui dependencies,
-Drizzle ORM + drizzle-kit, `@neondatabase/serverless`, and (dev) tsx and PGlite. Check
-`package.json` before assuming any other library exists.
+Drizzle ORM + drizzle-kit, `@neondatabase/serverless`, `@clerk/nextjs`, Zod 4, and (dev)
+tsx, PGlite and Vitest. Check `package.json` before assuming any other library exists.
 Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and is marked
-`// PLACEHOLDER`. Browser-only drafts use `lib/preview-store.ts`; never present them as bookings.
+`// PLACEHOLDER`. Itinerary plans are stored in the DB but hold no seats; never present them as bookings.
 
 ## Commands
 
@@ -29,9 +29,11 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
 - `npm run lint`: ESLint (flat config, `eslint.config.mjs`)
 - `npx tsc --noEmit`: type check
 - `npm run build`: production build (must pass before a phase is "done")
+- `npm test`: Vitest unit + PGlite integration tests (`tests/`)
 - `npm run db:verify`: offline DB check (migrations, seed, integrity checks, `sql/queries.sql`)
 - `npm run db:generate` after editing `lib/db/schema/`; `db:migrate` / `db:seed` need `.env.local`
-- Database design: `docs/DATABASE_DESIGN.md`, diagrams in `docs/ERD.md`
+- `npm run db:set-role -- <email> <role>`: operator-only role bootstrap (first admin)
+- Database design: `docs/DATABASE_DESIGN.md`, diagrams in `docs/ERD.md`. Auth: `docs/AUTHENTICATION.md`
 
 ## Next.js 16 specifics
 
@@ -49,8 +51,10 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
 - Build in phases: frontend first (static UI with clearly labelled placeholder
   data), then auth, then database, then backend features one at a time.
 - All database access is server-side only, in modules starting with
-  `import "server-only"` (planned: `lib/db/`, `lib/dal/`). Client components
+  `import "server-only"` (`lib/db/`, `lib/dal/`, `lib/auth/{clerk,viewer,guards}.ts`). Client components
   never import them.
+- Roles come only from `users.role` (new accounts are always guests). Pages gate with
+  `<Protected area>`, actions with `authorizeAction()`, and the DAL scopes by owner.
 - Secrets (`DATABASE_URL`, `CLERK_SECRET_KEY`, payment keys) are never prefixed
   with `NEXT_PUBLIC_`. Only the Clerk publishable key may be public.
   `.env*` is git-ignored. Keep `.env.example` with names only, no values.

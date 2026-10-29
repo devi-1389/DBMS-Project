@@ -15,6 +15,13 @@
       "when": 1793300771588,
       "tag": "0001_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793302717980,
+      "tag": "0002_guest_last_name_optional",
+      "breakpoints": true
     }
   ]
 }

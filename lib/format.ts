@@ -111,7 +111,10 @@ export function daysBetween(fromKey: string, toKey: string) {
 }
 
 export function isDateKey(value: unknown): value is string {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  // Round-trip so rolled-over dates such as 2026-02-30 are rejected.
+  const time = Date.parse(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === value;
 }
 
 /** "a", "a and b", "a, b and c" */

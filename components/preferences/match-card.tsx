@@ -5,11 +5,12 @@ import { Check } from "lucide-react";
 import { CategoryBadge } from "@/components/experiences/category-badge";
 import { PriceTag } from "@/components/experiences/price-tag";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { MatchResult } from "@/lib/matching/score";
+import type { Recommendation } from "@/lib/matching/recommend";
 import { experienceHref } from "@/lib/navigation";
 
-export function MatchCard({ match, rank }: { match: MatchResult; rank: number }) {
-  const { experience, reasons } = match;
+/** Compact recommendation with its match score and top reasons. */
+export function MatchCard({ match, rank, action }: { match: Recommendation; rank: number; action?: React.ReactNode }) {
+  const { experience, reasons, percent } = match;
 
   return (
     <article className="group relative flex gap-4 rounded-2xl border bg-card p-4 shadow-sm transition-shadow focus-within:ring-2 focus-within:ring-ring hover:shadow-md">
@@ -20,7 +21,10 @@ export function MatchCard({ match, rank }: { match: MatchResult; rank: number })
         </span>
       </div>
       <div className="min-w-0 flex-1">
-        <CategoryBadge category={experience.category} className="border-border" />
+        <div className="flex flex-wrap items-center gap-2">
+          <CategoryBadge category={experience.category} className="border-border" />
+          <span className="text-xs font-semibold text-forest-700">{percent}% match</span>
+        </div>
         <h3 className="mt-2 font-display text-xl leading-tight font-semibold">
           <Link
             href={experienceHref(experience.slug)}
@@ -37,7 +41,10 @@ export function MatchCard({ match, rank }: { match: MatchResult; rank: number })
             </li>
           ))}
         </ul>
-        <PriceTag amountMinor={experience.priceFromMinor} currency={experience.currency} className="mt-3 [&>span:nth-child(2)]:text-xl" />
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <PriceTag amountMinor={experience.priceFromMinor} currency={experience.currency} className="[&>span:nth-child(2)]:text-xl" />
+          {action && <div className="relative z-10">{action}</div>}
+        </div>
       </div>
     </article>
   );

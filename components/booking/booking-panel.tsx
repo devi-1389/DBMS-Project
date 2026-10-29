@@ -1,23 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { CalendarCheck, CalendarPlus, Lock, TriangleAlert } from "lucide-react";
+import { CalendarPlus, Lock } from "lucide-react";
 
+import { addSessionToPlanAction } from "@/app/actions/itinerary";
 import { QuantityInput } from "@/components/common/quantity-input";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatPrice, formatTimeRange, toDateKey } from "@/lib/format";
-import { createItem, findOverlaps, upsertItem } from "@/lib/itinerary";
-import { ROUTES } from "@/lib/navigation";
-import { itineraryStore, usePreviewStore } from "@/lib/preview-store";
+import { experienceHref, ROUTES } from "@/lib/navigation";
 import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
 import { cn } from "@/lib/utils";
 
 const seatsLeft = (slot: ExperienceSlot) => slot.capacity - slot.booked;
 
-export function BookingPanel({ experience, slots }: { experience: ExperienceSummary; slots: ExperienceSlot[] }) {
-  const [itinerary, setItinerary] = usePreviewStore(itineraryStore);
+type Feedback = { ok: boolean; message?: string; code?: string };
 
+export function BookingPanel({ experience, slots }: { experience: ExperienceSummary; slots: ExperienceSlot[] }) {
   const days = useMemo(() => {
     const map = new Map<string, ExperienceSlot[]>();
     for (const slot of slots) {
@@ -31,7 +30,8 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
   const [dayKey, setDayKey] = useState(firstOpenDay);
   const [slotId, setSlotId] = useState<string | null>(null);
   const [partySize, setPartySize] = useState(2);
-  const [status, setStatus] = useState<"added" | "updated" | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [pending, startTransition] = useTransition();
 
   const daySlots = days.find(([key]) => key === dayKey)?.[1] ?? [];
   // Default to the first open session of the chosen day.
@@ -43,16 +43,15 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
   const guests = Math.min(partySize, maxParty);
   const total = experience.priceFromMinor * guests;
 
-  const planned = itinerary?.items.find((item) => item.slotId === slot?.id);
-  const overlaps =
-    slot && itinerary
-      ? findOverlaps(itinerary.items, { slotId: slot.id, startsAt: slot.startsAt, endsAt: slot.endsAt })
-      : [];
-
-  const addToItinerary = () => {
-    if (!slot || !itinerary) return;
-    setItinerary(upsertItem(itinerary, createItem(experience, slot, guests)));
-    setStatus(planned ? "updated" : "added");
+  // The server resolves the session by experience and start time, re-checks it and
+  // the guest's ownership of the plan; nothing here is trusted beyond the request.
+  const addToPlan = () => {
+    if (!slot) return;
+    startTransition(async () => {
+      setFeedback(
+        await addSessionToPlanAction({ experienceSlug: experience.slug, startsAt: slot.startsAt, partySize: guests }),
+      );
+    });
   };
 
   if (days.length === 0) {
@@ -80,7 +79,7 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
                 onClick={() => {
                   setDayKey(key);
                   setSlotId(null);
-                  setStatus(null);
+                  setFeedback(null);
                 }}
                 className={cn(
                   "flex w-16 shrink-0 flex-col items-center rounded-xl border px-2 py-2 text-center transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-45",
@@ -112,7 +111,7 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
                 disabled={left <= 0}
                 onClick={() => {
                   setSlotId(candidate.id);
-                  setStatus(null);
+                  setFeedback(null);
                 }}
                 className={cn(
                   "flex items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50",
@@ -138,7 +137,7 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
         max={maxParty}
         onChange={(value) => {
           setPartySize(value);
-          setStatus(null);
+          setFeedback(null);
         }}
       />
 
@@ -156,37 +155,46 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
         </div>
       </dl>
 
-      {overlaps.length > 0 && (
-        <p className="mt-4 flex items-start gap-2 rounded-xl bg-gold-200/50 px-3 py-2 text-xs text-forest-900">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-gold-700" aria-hidden="true" />
-          Overlaps with {overlaps.map((item) => item.title).join(", ")} in your itinerary.
-        </p>
-      )}
-
       <div className="mt-6 grid gap-3">
-        <Button size="lg" variant="outline" onClick={addToItinerary} disabled={!slot || itinerary === undefined}>
-          {planned ? <CalendarCheck /> : <CalendarPlus />}
-          {planned ? "Update itinerary draft" : "Add to itinerary draft"}
+        <Button size="lg" variant="outline" onClick={addToPlan} disabled={!slot || pending}>
+          <CalendarPlus />
+          {pending ? "Adding…" : "Add to my plan"}
         </Button>
         <Button size="lg" disabled aria-describedby="booking-unavailable">
           <Lock />
           Online booking coming soon
         </Button>
         <p id="booking-unavailable" className="text-center text-xs text-muted-foreground">
-          Nothing is reserved or charged in this preview. Itinerary drafts stay in this browser.
+          Plans are saved to your account but don&apos;t reserve seats. Nothing is charged.
         </p>
       </div>
 
-      <p aria-live="polite" className="mt-3 text-center text-sm">
-        {status && (
-          <span className="font-semibold text-forest-700">
-            {status === "added" ? "Added to your itinerary draft. " : "Itinerary draft updated. "}
+      <div aria-live="polite" className="mt-3 text-center text-sm">
+        {feedback?.ok && (
+          <p className="font-semibold text-forest-700">
+            {feedback.message ?? "Added to your plan."}{" "}
             <Link href={ROUTES.itinerary} className="underline underline-offset-4">
               View itinerary
             </Link>
-          </span>
+          </p>
         )}
-      </p>
+        {feedback && !feedback.ok && (
+          <p role="alert" className="text-destructive">
+            {feedback.message}
+            {feedback.code === "unauthenticated" && (
+              <>
+                {" "}
+                <Link
+                  href={`${ROUTES.login}?redirect_url=${encodeURIComponent(experienceHref(experience.slug))}`}
+                  className="font-semibold underline underline-offset-4"
+                >
+                  Sign in
+                </Link>
+              </>
+            )}
+          </p>
+        )}
+      </div>
     </PanelShell>
   );
 }

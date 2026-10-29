@@ -11,11 +11,14 @@ export function BookingsTable({
   bookings,
   showGuest = false,
   actions,
+  detailHref,
   caption,
 }: {
   bookings: BookingSummary[];
   showGuest?: boolean;
   actions?: (booking: BookingSummary) => React.ReactNode;
+  /** Links each reference to its (ownership-checked) detail page. */
+  detailHref?: (booking: BookingSummary) => string;
   caption: string;
 }) {
   return (
@@ -38,7 +41,15 @@ export function BookingsTable({
           <TableBody>
             {bookings.map((booking) => (
               <TableRow key={booking.reference}>
-                <TableCell className="font-mono text-xs font-semibold">{booking.reference}</TableCell>
+                <TableCell className="font-mono text-xs font-semibold">
+                  {detailHref ? (
+                    <Link href={detailHref(booking)} className="hover:underline hover:underline-offset-4">
+                      {booking.reference}
+                    </Link>
+                  ) : (
+                    booking.reference
+                  )}
+                </TableCell>
                 {showGuest && <TableCell>{booking.guestName}</TableCell>}
                 <TableCell>
                   <Link href={experienceHref(booking.experienceSlug)} className="font-semibold hover:underline hover:underline-offset-4">

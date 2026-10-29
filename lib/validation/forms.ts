@@ -1,31 +1,9 @@
-// Client-side form checks for the preview. Server-side validation (Zod, shared with
-// Server Actions) replaces these when the backend exists; see the plan §4.
+// Client-side checks for the admin "New experience" form (saving arrives in Phase 7).
+// Data the server accepts is validated with the Zod schemas in ./schemas.ts.
 import { isExperienceCategory } from "@/lib/categories";
 import { isDifficulty } from "@/lib/difficulty";
 
 export type FieldErrors<K extends string> = Partial<Record<K, string>>;
-
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export type SignInValues = { email: string; password: string };
-
-export function validateSignIn(values: SignInValues): FieldErrors<keyof SignInValues> {
-  const errors: FieldErrors<keyof SignInValues> = {};
-  if (!EMAIL.test(values.email.trim())) errors.email = "Enter a valid email address.";
-  if (!values.password) errors.password = "Enter your password.";
-  return errors;
-}
-
-export type SignUpValues = { name: string; email: string; password: string; terms: boolean };
-
-export function validateSignUp(values: SignUpValues): FieldErrors<keyof SignUpValues> {
-  const errors: FieldErrors<keyof SignUpValues> = {};
-  if (values.name.trim().length < 2) errors.name = "Enter your name.";
-  if (!EMAIL.test(values.email.trim())) errors.email = "Enter a valid email address.";
-  if (values.password.length < 8) errors.password = "Use at least 8 characters.";
-  if (!values.terms) errors.terms = "Please accept the terms to continue.";
-  return errors;
-}
 
 export type ExperienceFormValues = {
   title: string;

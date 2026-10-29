@@ -1,11 +1,10 @@
-"use client";
-
-import { useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, Compass, Route, SlidersHorizontal, Sparkles, Ticket, Wallet } from "lucide-react";
 
+import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 import { EmptyState } from "@/components/common/empty-state";
 import { StatCard } from "@/components/common/stat-card";
+import { AddToPlanButton } from "@/components/itinerary/add-to-plan-button";
 import { MatchCard, MatchListSkeleton } from "@/components/preferences/match-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,40 +12,49 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatPrice, formatTimeRange } from "@/lib/format";
 import { INTEREST_LABELS } from "@/lib/interests";
 import { itineraryTotal } from "@/lib/itinerary";
-import { rankExperiences } from "@/lib/matching/score";
-import { experienceHref, ROUTES } from "@/lib/navigation";
-import { itineraryStore, preferencesStore, usePreviewStore } from "@/lib/preview-store";
-import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
+import type { Recommendation } from "@/lib/matching/recommend";
+import { bookingHref, experienceHref, ROUTES } from "@/lib/navigation";
+import type { BookingSummary } from "@/lib/types/booking";
+import type { GuestPreferences, ItineraryPlan } from "@/lib/types/guest";
 
-export function DashboardView({ experiences, slots }: { experiences: ExperienceSummary[]; slots: ExperienceSlot[] }) {
-  const [preferences] = usePreviewStore(preferencesStore);
-  const [itinerary] = usePreviewStore(itineraryStore);
-  const matches = useMemo(
-    () => (preferences ? rankExperiences(experiences, slots, preferences, 3) : []),
-    [experiences, slots, preferences],
+/** Server-rendered dashboard. Everything here comes from the database. */
+export function DashboardView({
+  firstName,
+  preferences,
+  plan,
+  bookings,
+  recommendations,
+  now,
+}: {
+  firstName: string;
+  preferences: GuestPreferences | null;
+  plan: ItineraryPlan | null;
+  bookings: BookingSummary[];
+  recommendations: Recommendation[];
+  now: Date;
+}) {
+  const upcomingPlan = (plan?.items ?? []).filter((item) => Date.parse(item.startsAt) > now.getTime()).slice(0, 4);
+  const upcomingBookings = bookings.filter(
+    (booking) => (booking.status === "confirmed" || booking.status === "pending") && Date.parse(booking.startsAt) > now.getTime(),
   );
-
-  if (preferences === undefined || itinerary === undefined) return <DashboardSkeleton />;
-
-  const upcoming = itinerary.items.slice(0, 4);
-  const total = itineraryTotal(itinerary.items);
 
   return (
     <div className="space-y-10">
+      <p className="font-display text-3xl">Good to see you, {firstName}.</p>
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Summary">
         <li>
-          <StatCard icon={Route} label="Itinerary sessions" value={itinerary.items.length} hint="Planned, not reserved" />
+          <StatCard icon={Route} label="Planned sessions" value={plan?.items.length ?? 0} hint={plan ? `In “${plan.name}”` : "No plan yet"} />
         </li>
         <li>
           <StatCard
             icon={Wallet}
             label="Plan estimate"
-            value={formatPrice(total, itinerary.items[0]?.currency)}
-            hint="Sample prices"
+            value={formatPrice(itineraryTotal(plan?.items ?? []), plan?.items[0]?.currency)}
+            hint="Planned, not booked"
           />
         </li>
         <li>
-          <StatCard icon={Ticket} label="Confirmed bookings" value={0} hint="Online booking coming soon" />
+          <StatCard icon={Ticket} label="Upcoming bookings" value={upcomingBookings.length} hint="Confirmed or pending" />
         </li>
         <li>
           <StatCard
@@ -70,13 +78,11 @@ export function DashboardView({ experiences, slots }: { experiences: ExperienceS
                 ? `Based on ${preferences.interests.map((id) => INTEREST_LABELS[id].toLowerCase()).slice(0, 3).join(", ")}${preferences.interests.length > 3 ? " and more" : ""}.`
                 : "Set your preferences to see personal matches."}
             </CardDescription>
-            {preferences && (
-              <CardAction>
-                <Button asChild variant="link" size="sm">
-                  <Link href={ROUTES.preferences}>Edit</Link>
-                </Button>
-              </CardAction>
-            )}
+            <CardAction>
+              <Button asChild variant="link" size="sm">
+                <Link href={ROUTES.recommendations}>See all</Link>
+              </Button>
+            </CardAction>
           </CardHeader>
           <CardContent>
             {!preferences ? (
@@ -90,22 +96,30 @@ export function DashboardView({ experiences, slots }: { experiences: ExperienceS
                   <Link href={ROUTES.preferences}>Set preferences</Link>
                 </Button>
               </EmptyState>
-            ) : matches.length === 0 ? (
+            ) : recommendations.length === 0 ? (
               <EmptyState
                 icon={Compass}
-                title="No matches with these settings"
-                description="Try a higher pace or a larger budget."
+                title="No matches in the next month"
+                description="Try different dates or filters on the recommendations page."
                 className="py-10"
               >
                 <Button asChild variant="outline">
-                  <Link href={ROUTES.preferences}>Adjust preferences</Link>
+                  <Link href={ROUTES.recommendations}>Adjust filters</Link>
                 </Button>
               </EmptyState>
             ) : (
               <ol className="space-y-4">
-                {matches.map((match, index) => (
+                {recommendations.map((match, index) => (
                   <li key={match.experience.slug}>
-                    <MatchCard match={match} rank={index + 1} />
+                    <MatchCard
+                      match={match}
+                      rank={index + 1}
+                      action={
+                        match.sessions[0] && (
+                          <AddToPlanButton slotId={match.sessions[0].id} partySize={preferences.groupSize} planId={plan?.id} label={`Plan ${formatDate(match.sessions[0].startsAt)}`} />
+                        )
+                      }
+                    />
                   </li>
                 ))}
               </ol>
@@ -120,36 +134,22 @@ export function DashboardView({ experiences, slots }: { experiences: ExperienceS
                 <CalendarDays className="size-5 text-gold-600" aria-hidden="true" />
                 Up next in your plan
               </CardTitle>
-              <CardDescription>From your itinerary draft.</CardDescription>
-              {upcoming.length > 0 && (
-                <CardAction>
-                  <Button asChild variant="link" size="sm">
-                    <Link href={ROUTES.itinerary}>View all</Link>
-                  </Button>
-                </CardAction>
-              )}
+              <CardDescription>Planned sessions aren&apos;t reserved.</CardDescription>
+              <CardAction>
+                <Button asChild variant="link" size="sm">
+                  <Link href={ROUTES.itinerary}>Open plan</Link>
+                </Button>
+              </CardAction>
             </CardHeader>
             <CardContent>
-              {upcoming.length === 0 ? (
-                <EmptyState
-                  icon={Route}
-                  title="Nothing planned yet"
-                  description="Add sessions from any experience page."
-                  className="py-10"
-                >
-                  <Button asChild variant="outline">
-                    <Link href={ROUTES.experiences}>Browse experiences</Link>
-                  </Button>
-                </EmptyState>
+              {upcomingPlan.length === 0 ? (
+                <EmptyState icon={Route} title="Nothing planned yet" description="Add sessions from recommendations." className="py-10" />
               ) : (
                 <ul className="divide-y">
-                  {upcoming.map((item) => (
-                    <li key={item.slotId} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                  {upcomingPlan.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
                       <div className="min-w-0">
-                        <Link
-                          href={experienceHref(item.experienceSlug)}
-                          className="block truncate font-semibold hover:underline hover:underline-offset-4"
-                        >
+                        <Link href={experienceHref(item.experienceSlug)} className="block truncate font-semibold hover:underline hover:underline-offset-4">
                           {item.title}
                         </Link>
                         <p className="text-sm text-muted-foreground">
@@ -173,10 +173,18 @@ export function DashboardView({ experiences, slots }: { experiences: ExperienceS
                 Bookings
               </CardTitle>
               <CardDescription>
-                You have no bookings. Online booking isn&apos;t available in this preview.
+                {upcomingBookings.length ? "Your next confirmed sessions." : "You have no upcoming bookings."}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {upcomingBookings.slice(0, 3).map((booking) => (
+                <div key={booking.reference} className="flex items-center justify-between gap-3">
+                  <Link href={bookingHref(booking.reference)} className="min-w-0 truncate font-semibold hover:underline">
+                    {booking.experienceTitle}
+                  </Link>
+                  <BookingStatusBadge status={booking.status} />
+                </div>
+              ))}
               <Button asChild variant="outline" className="w-full">
                 <Link href={ROUTES.myBookings}>
                   Go to my bookings
@@ -191,9 +199,10 @@ export function DashboardView({ experiences, slots }: { experiences: ExperienceS
   );
 }
 
-function DashboardSkeleton() {
+export function DashboardSkeleton() {
   return (
     <div className="space-y-10" role="status" aria-label="Loading dashboard">
+      <Skeleton className="h-9 w-72" />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-32 rounded-2xl" />
