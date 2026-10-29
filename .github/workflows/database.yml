@@ -52,6 +52,7 @@ jobs:
       - run: npm ci
 
       - name: Check the secrets are set
+        id: secrets
         run: |
           if [ -z "$DATABASE_URL" ] || [ -z "$DATABASE_URL_UNPOOLED" ]; then
             echo "::error::Add DATABASE_URL and DATABASE_URL_UNPOOLED in Settings → Secrets and variables → Actions."
@@ -64,7 +65,8 @@ jobs:
 
       - name: Load the sample data (experiences, sessions, staff, resources)
         if: inputs.task == 'migrate-and-seed'
-        run: npm run db:seed
+        # Safe to re-run: skips when the sample data is already there.
+        run: npm run db:seed -- --if-empty
 
       - name: Change a role
         if: inputs.task == 'set-role'
@@ -74,4 +76,6 @@ jobs:
         run: npm run db:set-role -- "$EMAIL" "$ROLE"
 
       - name: Database status
+        # Runs even if an earlier step failed, so the log always shows the database's state.
+        if: always() && steps.secrets.outcome == 'success'
         run: npm run db:status
