@@ -5,18 +5,32 @@ import Link from "next/link";
 import { CalendarPlus, Lock } from "lucide-react";
 
 import { addSessionToPlanAction } from "@/app/actions/itinerary";
+import { BookSessionDialog } from "@/components/booking/book-session-dialog";
 import { QuantityInput } from "@/components/common/quantity-input";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatPrice, formatTimeRange, toDateKey } from "@/lib/format";
+import { bookableSeats, isReady } from "@/lib/matching/recommend";
 import { experienceHref, ROUTES } from "@/lib/navigation";
 import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
 import { cn } from "@/lib/utils";
 
-const seatsLeft = (slot: ExperienceSlot) => slot.capacity - slot.booked;
+/** Places a new party can book: seats left, capped by shared equipment; 0 if it can't run. */
+const seatsLeft = (slot: ExperienceSlot) => (isReady(slot) ? bookableSeats(slot) : 0);
 
 type Feedback = { ok: boolean; message?: string; code?: string };
 
-export function BookingPanel({ experience, slots }: { experience: ExperienceSummary; slots: ExperienceSlot[] }) {
+export function BookingPanel({
+  experience,
+  slots,
+  mode,
+  notice,
+}: {
+  experience: ExperienceSummary;
+  slots: ExperienceSlot[];
+  /** "live": database sessions, bookable. "sample": placeholder sessions, no booking. */
+  mode: "live" | "sample";
+  notice?: string;
+}) {
   const days = useMemo(() => {
     const map = new Map<string, ExperienceSlot[]>();
     for (const slot of slots) {
@@ -56,14 +70,14 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
 
   if (days.length === 0) {
     return (
-      <PanelShell>
-        <p className="text-sm text-muted-foreground">No sessions are scheduled in the sample season.</p>
+      <PanelShell mode={mode} notice={notice}>
+        <p className="text-sm text-muted-foreground">No upcoming sessions are scheduled.</p>
       </PanelShell>
     );
   }
 
   return (
-    <PanelShell>
+    <PanelShell mode={mode} notice={notice}>
       <fieldset className="min-w-0">
         <legend className="text-sm font-semibold">Choose a date</legend>
         <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
@@ -120,7 +134,11 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
               >
                 <span className="font-semibold">{formatTimeRange(candidate.startsAt, candidate.endsAt)}</span>
                 <span className={cn("text-xs", left > 0 && left <= 3 ? "font-semibold text-gold-700" : "text-muted-foreground")}>
-                  {left <= 0 ? "Full" : `${left} seat${left > 1 ? "s" : ""} left`}
+                  {left > 0
+                    ? `${left} place${left > 1 ? "s" : ""} left`
+                    : isReady(candidate)
+                      ? "Full"
+                      : "Unavailable"}
                 </span>
               </button>
             );
@@ -160,12 +178,27 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
           <CalendarPlus />
           {pending ? "Adding…" : "Add to my plan"}
         </Button>
-        <Button size="lg" disabled aria-describedby="booking-unavailable">
-          <Lock />
-          Online booking coming soon
-        </Button>
-        <p id="booking-unavailable" className="text-center text-xs text-muted-foreground">
-          Plans are saved to your account but don&apos;t reserve seats. Nothing is charged.
+        {mode === "live" && slot ? (
+          <BookSessionDialog
+            slotId={slot.id}
+            title={experience.title}
+            startsAt={slot.startsAt}
+            endsAt={slot.endsAt}
+            partySize={guests}
+            unitPriceMinor={experience.priceFromMinor}
+            currency={experience.currency}
+            returnTo={experienceHref(experience.slug)}
+          />
+        ) : (
+          <Button size="lg" disabled aria-describedby="booking-note">
+            <Lock />
+            {mode === "live" ? "No open sessions" : "Booking needs live availability"}
+          </Button>
+        )}
+        <p id="booking-note" className="text-center text-xs text-muted-foreground">
+          {mode === "live"
+            ? "Booking reserves your places; you pay at the resort. Adding to your plan doesn't reserve anything."
+            : "Sample sessions only. Plans are saved to your account but don't reserve seats."}
         </p>
       </div>
 
@@ -199,14 +232,30 @@ export function BookingPanel({ experience, slots }: { experience: ExperienceSumm
   );
 }
 
-function PanelShell({ children }: { children: React.ReactNode }) {
+function PanelShell({ mode, notice, children }: { mode: "live" | "sample"; notice?: string; children: React.ReactNode }) {
   return (
     <section aria-labelledby="booking-panel-title" className="rounded-3xl border bg-card p-6 shadow-lg sm:p-7">
       <h2 id="booking-panel-title" className="font-display text-2xl font-semibold">
-        Plan this experience
+        Plan or book
       </h2>
-      <p className="mt-1 mb-6 text-sm text-muted-foreground">Sample season, 2 to 15 November. Resort time.</p>
+      <p className="mt-1 mb-6 text-sm text-muted-foreground">
+        {mode === "live"
+          ? "Live availability, checked for guides and equipment. Times are resort time (IST)."
+          : "Sample availability, 2 to 15 November. Resort time (IST)."}
+        {notice && <span className="mt-1 block text-gold-700">{notice}</span>}
+      </p>
       {children}
+    </section>
+  );
+}
+
+export function BookingPanelSkeleton() {
+  return (
+    <section aria-label="Loading availability" className="rounded-3xl border bg-card p-6 shadow-lg sm:p-7">
+      <div className="h-7 w-40 animate-pulse rounded bg-muted" />
+      <div className="mt-6 h-16 animate-pulse rounded-xl bg-muted" />
+      <div className="mt-4 h-24 animate-pulse rounded-xl bg-muted" />
+      <div className="mt-6 h-11 animate-pulse rounded-full bg-muted" />
     </section>
   );
 }

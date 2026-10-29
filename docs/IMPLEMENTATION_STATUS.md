@@ -2,14 +2,28 @@
 
 The SOLACE resort website, built on LUXE-ECO, its experience-management system.
 
-Last updated: 2026-10-29 (SOLACE alignment with the project brief, after Phase 3 + 5)
+Last updated: 2026-10-30 (Phase 6: online booking)
 
 Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not started ·
 `[mock]` UI exists but uses placeholder data (not a working feature)
 
 ## Current state
 
-- **SOLACE alignment (latest):**
+- **Online booking (Phase 6, latest):** guests can book a session from its experience
+  page or from their itinerary, then change the number of guests or cancel. Payment is
+  at the resort.
+  - Everything runs in one database transaction that locks the session. The database
+    rules have the final say on seats and shared equipment.
+  - The rules: bookings close 2 hours before the start; changes and cancellations
+    close 24 hours before (administrators can cancel at any time).
+  - Experience pages show live sessions from the database when it's configured, and
+    sample sessions (no booking) otherwise.
+  - Not yet tried on the live site: sign-in isn't working there yet. The sign-in setup
+    page now names the exact key problem (for example a shortened `sk_test_…` key).
+- **Neon database (live):** created from GitHub Actions (`Database (Neon)` workflow).
+  The tables and sample data are in the owner's Neon project. Vercel still needs the
+  database and Clerk variables, then a redeploy.
+- **SOLACE alignment:**
   - The site is branded SOLACE, and LUXE-ECO names the matching and planning system.
   - Prices are in ₹ and times in IST.
   - 18 experiences now cover the brief, including spa, kayaking, cycling, a local food
@@ -36,9 +50,8 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
 - **Still placeholder data:** the public catalogue (`/`, `/experiences`,
   `/experiences/[slug]`) reads `lib/placeholder/catalogue.ts`. The DB seed holds the
   same records, and a plan item resolves its DB session by experience + start time.
-- **Bookings can't be created yet** (Phase 6). "Online booking coming soon" stays
-  disabled. Bookings shown in the guest, staff and admin areas are the dev seed's sample
-  rows.
+- **Bookings:** real once sign-in works (Phase 6). Payments are recorded at the resort,
+  not online. The seed's sample bookings are still in the database.
 - Removed this phase: `localStorage` drafts (`lib/preview-store.ts`), the preview login
   forms, and `lib/matching/score.ts`. The new explainable engine replaces it.
 - Database design: 27 tables, 3 views, and migrations `0000`–`0004`:
@@ -238,14 +251,45 @@ sustainability and resource sharing.
 - [x] SQL examples Q17–Q20: readiness, shared pools, budgets, favourite categories.
 - [ ] Guest gear lending (borrow a bicycle or camera outside an experience): not
       modelled yet; it would be a loan table with the same capacity trigger.
-- [ ] Booking and feedback steps of the brief: Phase 6 (bookings) and Phase 7 (reviews).
+- [x] Booking step of the brief: Phase 6.
+- [ ] Feedback step of the brief: Phase 7 (reviews).
 
 ## Phase 6: Bookings (transactional)
 
-- [ ] Zod-validated booking Server Action
-- [ ] Transaction: lock slot, re-check capacity, resource and staff availability, insert booking
-- [ ] Cancellation / modification rules and capacity release
-- [ ] Concurrency test (no overbooking under parallel requests)
+- [x] Server Actions `createBookingAction`, `cancelBookingAction` and
+      `changeBookingGuestsAction` (`app/actions/bookings.ts`).
+      - Each authenticates, authorizes, validates with strict Zod schemas, then calls
+        the DAL.
+      - The client sends only the session, the guest count and an idempotency key. The
+        price always comes from the database.
+- [x] Transaction (`lib/dal/booking-writes.ts`):
+      - Locks the session row, then checks the session can still be booked
+        (published, not started, ≥ 2 h before), the group size, the seats left and
+        readiness (guide, venue, shared equipment).
+      - Inserts a confirmed booking (`ON CONFLICT` on the idempotency key), then
+        per-guest equipment holds in resource-id order.
+      - Links the guest's plan item and records the actor in the status history.
+      - Database refusals are turned into clear messages: `LXB01` → sold out,
+        `LXR01` → equipment, `23505` on the active-booking index → already booked.
+- [x] Cancellation: guests can cancel until 24 h before the start; administrators at
+      any time. It releases the seats (trigger) and equipment holds, and the plan item
+      goes back to "planned".
+- [x] Change guests: until 24 h before. Seats are adjusted by the trigger and equipment
+      holds are resized, both re-checked against capacity.
+- [x] UI:
+      - Experience page: live sessions, checked for guides and equipment, with
+        **Book now** and a confirmation dialog.
+      - Itinerary: **Book** on planned sessions.
+      - Booking page: change guests and cancel.
+- [x] Tests: 16 new (create, equipment holds, plan link, idempotent retry, second
+      booking refused, every refusal, guest-only, cancel + rebook, 24 h window,
+      administrator override, ownership, change guests, live sessions, actions). A
+      mutation check confirmed that removing the ownership check or the 24 h rule makes
+      tests fail.
+- [~] Concurrency: the database-level race test (`npm run db:test:concurrency`, real
+      parallel connections) still covers overbooking. The new app-level path takes the
+      same slot lock but hasn't been raced in parallel (PGlite is single-connection).
+- [ ] Online card payments (pay at resort only for now).
 
 ## Phase 7: Operations MVP
 
@@ -309,6 +353,11 @@ once, run `db:set-role` for the first admin, and check the flows by hand.
 | 2026-10-29 | SOLACE | `npm run build` | Pass (35 static/partial pages incl. 18 experience pages) |
 | 2026-10-29 | SOLACE | Playwright on `next start` (no Clerk keys; ad hoc scripts, not in repo) | 27/27 rebrand checks (SOLACE title and logo, LUXE-ECO copy, ₹ only, 18 experiences, 6 new detail pages, 7:00 am IST times, no overflow at 375px, no console errors) and 33/33 auth checks again |
 | 2026-10-29 | SOLACE | Signed-in pages (budget, categories, day planner) in a browser | Not run: needs Clerk keys. Logic covered by integration tests |
+| 2026-10-30 | 6     | `npx tsc --noEmit` / `npm run lint` / `npm run build` | Pass (lint first flagged JSX inside try/catch in the live panel; fixed) |
+| 2026-10-30 | 6     | `npm test` | 112/112 pass (16 new booking and diagnostics tests); mutation check: removing ownership or the 24 h rule fails tests |
+| 2026-10-30 | 6     | `npm run db:verify` / `npm run db:check` | 71/71 pass / "Everything's fine" |
+| 2026-10-30 | 6     | Playwright on `next start` (no keys, no database) | Booking panel in sample mode with booking disabled (5/5); auth checks 33/33; rebrand checks 27/27. With a shortened `sk_test_o…TEaJ` key the setup page names the problem and shows no key value |
+| 2026-10-30 | 6     | Booking with a real Neon database and Clerk sign-in | Not run here: no network access to Neon/Clerk from this environment |
 
 Known Next 16 behaviour: the previous route stays mounted but hidden (`display: none`)
 for instant back navigation, so DOM queries in tests must ignore hidden elements.

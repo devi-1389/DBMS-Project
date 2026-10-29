@@ -73,7 +73,7 @@ export function MatchingSection({
               </Link>
             </Button>
             <p className="text-sm text-muted-foreground">
-              Preferences and plans are saved to your account. Online booking is coming soon.
+              Preferences and plans are saved to your account. Book online and pay at the resort.
             </p>
           </div>
         </div>

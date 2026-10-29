@@ -27,3 +27,13 @@ export function pgErrorCode(error: unknown): string | undefined {
   }
   return undefined;
 }
+
+/** Name of the violated constraint (e.g. a unique index) from a driver error, if any. */
+export function pgConstraint(error: unknown): string | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current && typeof current === "object"; depth++) {
+    if ("constraint" in current && typeof current.constraint === "string") return current.constraint;
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return undefined;
+}

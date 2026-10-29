@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { CalendarPlus, CircleCheck, Lightbulb, Route, Ticket, TriangleAlert, Users, Wallet } from "lucide-react";
 
+import { BookSessionDialog } from "@/components/booking/book-session-dialog";
 import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 import { EmptyState } from "@/components/common/empty-state";
 import { AddToPlanButton } from "@/components/itinerary/add-to-plan-button";
@@ -9,6 +10,7 @@ import { CreatePlanDialog, EditPlanForm } from "@/components/itinerary/plan-form
 import { DeletePlanButton, PlanItemControls } from "@/components/itinerary/plan-item-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isBookable } from "@/lib/bookings";
 import { formatAmount, formatDate, formatDateKey, formatPrice, formatTimeRange, toDateKey } from "@/lib/format";
 import { conflictMap, isOutsideStay, itineraryTotal, planDays } from "@/lib/itinerary";
 import type { SuggestedItinerary } from "@/lib/matching/recommend";
@@ -356,7 +358,23 @@ function PlannedRow({ item, conflicts, showDate }: { item: PlannedItem; conflict
         )}
       </div>
       {!item.booking && item.slotStatus === "scheduled" && (
-        <PlanItemControls itemId={item.id} title={item.title} partySize={item.partySize} maxParty={item.seatsLeft} />
+        <div className="flex flex-col items-end gap-2">
+          <PlanItemControls itemId={item.id} title={item.title} partySize={item.partySize} maxParty={item.seatsLeft} />
+          {isBookable(item.startsAt, new Date()) && item.seatsLeft >= item.partySize && (
+            <BookSessionDialog
+              slotId={item.slotId}
+              title={item.title}
+              startsAt={item.startsAt}
+              endsAt={item.endsAt}
+              partySize={item.partySize}
+              unitPriceMinor={item.unitPriceMinor}
+              currency={item.currency}
+              returnTo={ROUTES.itinerary}
+              label="Book"
+              size="sm"
+            />
+          )}
+        </div>
       )}
     </li>
   );

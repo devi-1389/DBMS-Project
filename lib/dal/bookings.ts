@@ -11,6 +11,7 @@ import {
   experienceSlots,
   guestProfiles,
   paymentAttempts,
+  slotReadiness,
   staffAssignments,
 } from "@/lib/db/schema";
 import type { Db } from "@/lib/db/types";
@@ -90,6 +91,8 @@ export async function listAllBookings(db: Db, actor: Viewer, limit = 200): Promi
 export type BookingDetail = BookingSummary & {
   meetingPoint: string;
   ownedByViewer: boolean;
+  /** Most guests this booking could be changed to right now (seats, group size, shared equipment). */
+  maxPartySize: number;
   history: { from: BookingStatus | null; to: BookingStatus; changedAt: string }[];
   payments: { method: "pay_at_resort" | "card"; status: string; amountMinor: number; attemptedAt: string }[];
 };
@@ -120,6 +123,20 @@ export async function getBookingForViewer(db: Db, viewer: Viewer, reference: str
   }
   if (!allowed) return null;
 
+  const [limits] = await db
+    .select({
+      capacity: experienceSlots.capacity,
+      seatsBooked: experienceSlots.seatsBooked,
+      maxGroupSize: experiences.maxGroupSize,
+      bookableSeats: slotReadiness.bookableSeats,
+    })
+    .from(experienceSlots)
+    .innerJoin(experiences, eq(experiences.id, experienceSlots.experienceId))
+    .leftJoin(slotReadiness, eq(slotReadiness.slotId, experienceSlots.id))
+    .where(eq(experienceSlots.id, row.slotId));
+  const extra = Math.max(0, Math.min(limits.capacity - limits.seatsBooked, limits.bookableSeats ?? Number.POSITIVE_INFINITY));
+  const maxPartySize = Math.min(limits.capacity, limits.maxGroupSize, row.partySize + extra);
+
   const history = await db
     .select({ from: bookingStatusHistory.fromStatus, to: bookingStatusHistory.toStatus, changedAt: bookingStatusHistory.changedAt })
     .from(bookingStatusHistory)
@@ -140,6 +157,7 @@ export async function getBookingForViewer(db: Db, viewer: Viewer, reference: str
     ...toSummary(row),
     meetingPoint: row.meetingPoint,
     ownedByViewer: owner,
+    maxPartySize,
     history: history.map((item) => ({ ...item, changedAt: item.changedAt.toISOString() })),
     payments: payments.map((item) => ({
       method: item.method,

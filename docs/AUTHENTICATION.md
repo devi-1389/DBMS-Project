@@ -72,6 +72,16 @@ servers.
 Clerk development keys (`pk_test_…`) work on `*.vercel.app` domains. A Clerk production
 instance needs a domain you own.
 
+### Troubleshooting sign-in
+
+`/login` names the problem with each key, without showing its value:
+
+- "isn't set": the variable is missing, or the site wasn't redeployed after adding it.
+- "shortened key": the copied value contains "…". Clerk only shows a secret key in
+  full when it's created; use **Add new key**.
+- "spaces or quotes": paste only the key itself.
+- "swapped": the publishable and secret values are in each other's place.
+
 ### Without credentials
 
 The app fails closed. There's no bypass and no fallback user.
@@ -136,7 +146,7 @@ Admins can open all three (`lib/auth/roles.ts`).
 |---|---|---|
 | Preferences | `guest_preferences`, `guest_interests` (weight 1–5), `guest_preferred_times`, `guest_preferred_categories` | Saved in one transaction by `savePreferencesAction` |
 | Itinerary plans | `itinerary_plans` (optional activity budget in ₹), `itinerary_items` | Up to 10 plans × 40 items; stay of at most 21 nights |
-| Bookings | `bookings` and history | Read-only for now; creating bookings is Phase 6 |
+| Bookings | `bookings`, history, `resource_allocations` | Book, change guests or cancel your own (Phase 6); administrators can cancel any booking |
 
 **Plans are not bookings.** Adding a session to a plan never changes `seats_booked`, and
 plans appear separately from bookings everywhere. Seats are checked only to give the guest

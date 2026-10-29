@@ -88,6 +88,43 @@ export async function listCatalogue(db: Db, window: { from: Date; to: Date }): P
   };
 }
 
+/** One experience's scheduled sessions starting within [from, to), with readiness. */
+export async function listExperienceSessions(db: Db, experienceSlug: string, window: { from: Date; to: Date }) {
+  const rows = await db
+    .select({
+      id: experienceSlots.id,
+      startsAt: experienceSlots.startsAt,
+      endsAt: experienceSlots.endsAt,
+      capacity: experienceSlots.capacity,
+      seatsBooked: experienceSlots.seatsBooked,
+      readiness: {
+        slotId: slotReadiness.slotId,
+        staffAssigned: slotReadiness.staffAssigned,
+        staffNames: slotReadiness.staffNames,
+        resourcesConfirmed: slotReadiness.resourcesConfirmed,
+        resourcesMissing: slotReadiness.resourcesMissing,
+        guestLimit: slotReadiness.guestLimit,
+        limitingResource: slotReadiness.limitingResource,
+        ready: slotReadiness.ready,
+        bookableSeats: slotReadiness.bookableSeats,
+      },
+    })
+    .from(experienceSlots)
+    .innerJoin(experiences, eq(experiences.id, experienceSlots.experienceId))
+    .leftJoin(slotReadiness, eq(slotReadiness.slotId, experienceSlots.id))
+    .where(
+      and(
+        eq(experiences.slug, experienceSlug),
+        eq(experiences.status, "published"),
+        eq(experienceSlots.status, "scheduled"),
+        gte(experienceSlots.startsAt, window.from),
+        lt(experienceSlots.startsAt, window.to),
+      ),
+    )
+    .orderBy(asc(experienceSlots.startsAt));
+  return rows.map((row) => toSlot(row, experienceSlug, row.readiness));
+}
+
 /** Resolves a session by its natural key (unique experience + start time). */
 export async function findSlotId(db: Db, experienceSlug: string, startsAt: Date) {
   const [row] = await db

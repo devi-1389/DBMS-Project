@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Accessibility, Check, Clock, Gauge, MapPin, MessageSquareText, Users, UserRound } from "lucide-react";
 
-import { BookingPanel } from "@/components/booking/booking-panel";
+import { BookingPanelSkeleton } from "@/components/booking/booking-panel";
+import { LiveBookingPanel } from "@/components/booking/live-booking-panel";
 import { EmptyState } from "@/components/common/empty-state";
 import { CategoryBadge } from "@/components/experiences/category-badge";
 import { ExperienceCard } from "@/components/experiences/experience-card";
@@ -144,7 +146,10 @@ export default async function ExperiencePage({ params }: PageProps<"/experiences
         </div>
 
         <div className="min-w-0 lg:sticky lg:top-28 lg:self-start">
-          <BookingPanel experience={experience} slots={slots} />
+          {/* Live sessions are request-time data (seats change with every booking). */}
+          <Suspense fallback={<BookingPanelSkeleton />}>
+            <LiveBookingPanel experience={experience} sampleSlots={slots} />
+          </Suspense>
         </div>
       </div>
 

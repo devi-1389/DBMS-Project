@@ -29,11 +29,13 @@ vi.mock("next/server", async (importOriginal) => ({
 }));
 
 const { changeUserRoleAction } = await import("@/app/actions/admin");
+const { cancelBookingAction, changeBookingGuestsAction, createBookingAction } = await import("@/app/actions/bookings");
 const { addSessionToPlanAction } = await import("@/app/actions/itinerary");
 const { savePreferencesAction } = await import("@/app/actions/preferences");
 const { POST: clerkWebhook } = await import("@/app/api/webhooks/clerk/route");
 const { checkPageAccess } = await import("@/lib/auth/guards");
 const { getPreferences } = await import("@/lib/dal/preferences");
+const { findSlotId } = await import("@/lib/dal/catalogue");
 
 let t: TestDb;
 beforeAll(async () => {
@@ -161,6 +163,43 @@ describe("guest actions", () => {
       ok: false,
       code: "slot-not-found",
     });
+  });
+});
+
+describe("booking actions", () => {
+  const slot = async () => (await findSlotId(t.db as Db, "starlit-observatory", new Date(at("2026-11-09", "20:30"))))!;
+
+  it("require sign-in", async () => {
+    expect(await createBookingAction({ slotId: await slot(), partySize: 1, idempotencyKey: crypto.randomUUID() })).toMatchObject({
+      ok: false,
+      code: "unauthenticated",
+    });
+  });
+
+  it("reject client-supplied prices and guest IDs", async () => {
+    await signInAs("a.moreau@example.com");
+    const base = { slotId: await slot(), partySize: 1, idempotencyKey: crypto.randomUUID() };
+    expect(await createBookingAction({ ...base, unitPrice: 1 })).toMatchObject({ code: "invalid" });
+    expect(await createBookingAction({ ...base, guestId: crypto.randomUUID() })).toMatchObject({ code: "invalid" });
+    expect(await createBookingAction({ ...base, partySize: 0 })).toMatchObject({ code: "invalid" });
+  });
+
+  it("book, change and cancel for the signed-in guest only", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: BEFORE_SEASON });
+    await signInAs("a.moreau@example.com");
+    const booked = await createBookingAction({ slotId: await slot(), partySize: 2, idempotencyKey: crypto.randomUUID() });
+    expect(booked).toMatchObject({ ok: true, data: { created: true }, message: expect.stringMatching(/payable at the resort/) });
+    if (!booked.ok) return;
+    const reference = booked.data.reference;
+
+    await signInAs("s.haddad@example.com");
+    expect(await cancelBookingAction(reference)).toMatchObject({ ok: false, code: "not-found" });
+    expect(await changeBookingGuestsAction({ reference, partySize: 1 })).toMatchObject({ ok: false, code: "not-found" });
+
+    await signInAs("a.moreau@example.com");
+    expect(await changeBookingGuestsAction({ reference, partySize: 3 })).toMatchObject({ ok: true });
+    expect(await cancelBookingAction(reference)).toMatchObject({ ok: true });
+    expect(await cancelBookingAction("not-a-reference")).toMatchObject({ code: "invalid" });
   });
 });
 

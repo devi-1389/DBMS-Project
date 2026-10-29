@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { isClerkConfigured } from "@/lib/auth/config";
+import { clerkKeyProblems, isClerkConfigured } from "@/lib/auth/config";
 import { canAccess, isRole, ROLES } from "@/lib/auth/roles";
 import { protectedAreaFor, safeReturnPath } from "@/lib/auth/routes";
 
@@ -56,6 +56,24 @@ describe("protected routes", () => {
 
 describe("Clerk configuration", () => {
   afterEach(() => vi.unstubAllEnvs());
+
+  it("explains what's wrong with each key, without the value", () => {
+    const problems = (publishable: string, secret: string) => {
+      vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", publishable);
+      vi.stubEnv("CLERK_SECRET_KEY", secret);
+      return Object.fromEntries(clerkKeyProblems().map((item) => [item.name, item.problem]));
+    };
+    expect(problems("", "")).toEqual({
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "isn't set",
+      CLERK_SECRET_KEY: "isn't set",
+    });
+    expect(problems("pk_test_abc123", "sk_test_o…TEaJ").CLERK_SECRET_KEY).toMatch(/shortened key/);
+    expect(problems("pk_test_abc123", " sk_test_abc ").CLERK_SECRET_KEY).toMatch(/spaces or quotes/);
+    expect(problems("sk_test_abc", "pk_test_abc").NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY).toMatch(/swapped/);
+    expect(problems("pk_abc", "sk_test_abc").NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY).toMatch(/should start with pk_test_/);
+    expect(problems("pk_test_abc123", "sk_test_abc123")).toEqual({});
+    expect(JSON.stringify(problems("pk_test_abc123", "sk_test_o…TEaJ"))).not.toContain("TEaJ");
+  });
 
   it("is off unless both keys look real", () => {
     vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", "");

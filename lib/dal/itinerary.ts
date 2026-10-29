@@ -12,7 +12,7 @@ import {
   slotReadiness,
 } from "@/lib/db/schema";
 import type { Db } from "@/lib/db/types";
-import { formatDate, formatDateKey, joinList } from "@/lib/format";
+import { formatDate, formatDateKey } from "@/lib/format";
 import { isOutsideStay, MAX_ITEMS_PER_PLAN, MAX_PLANS_PER_GUEST, overlaps } from "@/lib/itinerary";
 import { decimalToMinor, minorToDecimal } from "@/lib/money";
 import type { ItineraryPlan, ItineraryPlanSummary, PlannedItem } from "@/lib/types/guest";
@@ -20,6 +20,7 @@ import type { PlanInput } from "@/lib/validation/schemas";
 
 import { fail, ok, type DalResult } from "./errors";
 import { toCategory } from "./mappers";
+import { readinessColumns, readinessProblem } from "./readiness";
 
 // Every query is scoped to the plan owner's guest ID: another guest's plan IDs
 // behave exactly like IDs that don't exist.
@@ -173,45 +174,6 @@ async function targetPlan(db: Db, guestId: string, planId: string | undefined) {
   if (latest) return latest;
   const [created] = await db.insert(itineraryPlans).values({ guestId, name: "My stay" }).returning(planSummaryColumns);
   return created;
-}
-
-const readinessColumns = {
-  ready: slotReadiness.ready,
-  staffAssigned: slotReadiness.staffAssigned,
-  missing: slotReadiness.resourcesMissing,
-  bookableSeats: slotReadiness.bookableSeats,
-  limitingResource: slotReadiness.limitingResource,
-};
-
-type ReadinessCheck = {
-  ready: boolean | null;
-  staffAssigned: number | null;
-  missing: string[] | null;
-  bookableSeats: number | null;
-  limitingResource: string | null;
-};
-
-/**
- * LUXE-ECO availability check: the session needs its guide or host, its venue/boats/
- * vehicle, and enough units in shared equipment pools for the party.
- */
-function readinessProblem(slot: ReadinessCheck, partySize: number) {
-  if (slot.ready === false) {
-    const missing = slot.missing ?? [];
-    const why = !slot.staffAssigned
-      ? "no guide or host is assigned yet"
-      : `${joinList(missing)} ${missing.length > 1 ? "aren't" : "isn't"} available`;
-    return fail("slot-not-ready", `This session can't run as scheduled: ${why}. Please pick another session.`);
-  }
-  if (slot.bookableSeats !== null && partySize > slot.bookableSeats) {
-    const places = `${slot.bookableSeats} ${slot.bookableSeats === 1 ? "place" : "places"}`;
-    return fail(
-      "not-enough-equipment",
-      `Only ${places} left: the shared ${slot.limitingResource ?? "equipment"} pool is nearly in use for this time. Plans don't hold equipment.`,
-      "partySize",
-    );
-  }
-  return null;
 }
 
 const touchPlan = (db: Db, planId: string) =>

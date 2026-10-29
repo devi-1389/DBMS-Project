@@ -184,7 +184,7 @@ rescheduled or cancelled while seats are held (`LXT01`).
 db:test:concurrency`). 8 sessions raced for 3 seats: 3 succeeded, 5 got `LXB01`,
 `seats_booked = 3`. 30 sessions raced for 7 seats: 7 succeeded, 23 got `LXB01`.
 
-### Booking transaction shape (for Phase 6)
+### Booking transaction shape (implemented in `lib/dal/booking-writes.ts`, Phase 6)
 
 ```sql
 BEGIN;  -- READ COMMITTED (default)

@@ -5,13 +5,15 @@ import { notFound } from "next/navigation";
 import { MapPin, Users } from "lucide-react";
 
 import { Protected } from "@/components/auth/protected";
+import { ManageBooking } from "@/components/booking/manage-booking";
 import { BookingStatusBadge } from "@/components/bookings/booking-status-badge";
 import { Breadcrumbs } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Viewer } from "@/lib/auth/types";
 import { getDb } from "@/lib/db";
 import { getBookingForViewer } from "@/lib/dal/bookings";
-import { formatDate, formatPrice, formatTimeRange } from "@/lib/format";
+import { BOOKING_POLICY, isActiveBooking, isChangeable } from "@/lib/bookings";
+import { formatDate, formatPrice, formatTime, formatTimeRange } from "@/lib/format";
 import { experienceHref, ROUTES } from "@/lib/navigation";
 
 export const metadata: Metadata = { title: "Booking" };
@@ -40,6 +42,11 @@ async function BookingContent({
   // looks exactly like a booking that doesn't exist.
   const booking = await getBookingForViewer(getDb(), viewer, decodeURIComponent(reference));
   if (!booking) notFound();
+
+  const now = new Date();
+  const changeable = isChangeable(booking, now);
+  const deadline = new Date(Date.parse(booking.startsAt) - BOOKING_POLICY.changeHours * 3_600_000).toISOString();
+  const isAdmin = viewer.role === "admin";
 
   return (
     <article className="space-y-8">
@@ -120,9 +127,19 @@ async function BookingContent({
           )}
         </section>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Changes and cancellations open with online booking. Contact the resort team for anything urgent.
-      </p>
+      {isActiveBooking(booking.status) && (booking.ownedByViewer || isAdmin) ? (
+        <ManageBooking
+          reference={booking.reference}
+          title={`${booking.experienceTitle}, ${formatDate(booking.startsAt)} at ${formatTime(booking.startsAt)}`}
+          partySize={booking.partySize}
+          maxPartySize={booking.maxPartySize}
+          canChangeGuests={booking.ownedByViewer && changeable}
+          canCancel={changeable || isAdmin}
+          deadline={`${formatDate(deadline)}, ${formatTime(deadline)}`}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">Payment is taken at the resort. Contact the resort team for anything urgent.</p>
+      )}
     </article>
   );
 }
