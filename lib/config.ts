@@ -1,8 +1,9 @@
-// PLACEHOLDER: resort locale settings until "timezone and currency" is decided
-// (docs/IMPLEMENTATION_PLAN.md, missing decision 5). Sample times are stored in UTC
-// and displayed in this zone.
+// SOLACE resort locale. Prices are in Indian rupees (the project brief budgets in ₹), so
+// the resort runs on India Standard Time. The database stores UTC (timestamptz); dates
+// and times are shown, and "today" is decided, in this zone.
 export const RESORT = {
-  locale: "en-US",
-  timeZone: "UTC",
-  currency: "USD",
+  name: "SOLACE",
+  locale: "en-IN",
+  timeZone: "Asia/Kolkata",
+  currency: "INR",
 } as const;

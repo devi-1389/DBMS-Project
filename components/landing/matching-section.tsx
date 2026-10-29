@@ -10,22 +10,23 @@ import { Button } from "@/components/ui/button";
 import { ROUTES, SECTION_IDS } from "@/lib/navigation";
 import type { ExperienceSummary } from "@/lib/types/experience";
 
+// The LUXE-ECO flow: preferences → matching → availability → plan (booking and feedback follow).
 const steps = [
   {
     title: "Share what moves you",
-    description: "Interests, pace, fitness, budget and any accessibility needs. Take two minutes or skip it.",
+    description: "Interests, pace, budget, group size, accessibility needs and the times of day you prefer.",
   },
   {
-    title: "We weigh every experience",
-    description: "Each experience is compared with your preferences, its difficulty, its price and when it runs.",
+    title: "LUXE-ECO weighs every experience",
+    description: "Each one is scored against your preferences, and every score comes with plain reasons.",
   },
   {
-    title: "See why it fits",
-    description: "Every suggestion comes with plain reasons, so you never have to trust a mystery score.",
+    title: "Availability is checked for real",
+    description: "Only sessions with seats, an assigned guide and the equipment or venue they need are suggested.",
   },
   {
-    title: "Refine any time",
-    description: "Change a preference and your shortlist changes with you.",
+    title: "Your days, planned",
+    description: "Get a day-by-day plan that fits your stay and activity budget, then refine it any time.",
   },
 ];
 
@@ -46,7 +47,7 @@ export function MatchingSection({
             id="matching-title"
             eyebrow="Personalised matching"
             title="Experiences chosen around you"
-            description="Tell us how you like to travel. LUXE-ECO compares every experience with your preferences and shows you exactly why each one made your shortlist."
+            description="Tell us how you like to travel. LUXE-ECO, the system behind every SOLACE stay, matches experiences to your preferences, budget and schedule, and shows exactly why each one made your shortlist."
           />
           <ol className="mt-12 space-y-8">
             {steps.map((step, index) => (
@@ -72,7 +73,7 @@ export function MatchingSection({
               </Link>
             </Button>
             <p className="text-sm text-muted-foreground">
-              Preview: matches update live; saved in this browser only.
+              Preferences and plans are saved to your account. Online booking is coming soon.
             </p>
           </div>
         </div>

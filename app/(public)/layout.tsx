@@ -1,10 +1,10 @@
 import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
+import { SiteHeaderWithAccount } from "@/components/layout/site-chrome";
 
 export default function PublicLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <SiteHeader />
+      <SiteHeaderWithAccount />
       <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         {children}
       </main>

@@ -1,7 +1,9 @@
 # LUXE-ECO Entity-Relationship Diagram
 
+LUXE-ECO is the experience system behind the SOLACE resort.
+
 Source of truth: `lib/db/schema/*.ts` → migrations in `drizzle/`. Design rationale is in
-[`DATABASE_DESIGN.md`](./DATABASE_DESIGN.md). 26 tables, 2 views.
+[`DATABASE_DESIGN.md`](./DATABASE_DESIGN.md). 27 tables, 3 views.
 
 Notation (Mermaid crow's foot): `||` exactly one · `|o` zero or one · `o{` zero or more ·
 `|{` one or more. Keys: **PK** primary key, **FK** foreign key, **UK** unique.
@@ -18,6 +20,8 @@ erDiagram
     guest_profiles ||--o{ guest_interests : "weights"
     interests ||--o{ guest_interests : "chosen as"
     guest_profiles ||--o{ guest_preferred_times : "prefers"
+    guest_profiles ||--o{ guest_preferred_categories : "favours"
+    experience_categories ||--o{ guest_preferred_categories : "favoured as"
 
     experience_categories ||--o{ experiences : "groups"
     suppliers |o--o{ experiences : "operates"
@@ -112,6 +116,10 @@ erDiagram
         uuid guest_id PK,FK "CASCADE"
         time_of_day time_of_day PK "morning | daytime | evening"
     }
+    guest_preferred_categories {
+        uuid guest_id PK,FK "CASCADE"
+        smallint category_id PK,FK "RESTRICT"
+    }
     users ||--o{ auth_identities : ""
     users ||--o| guest_profiles : ""
     users |o--o| staff_members : ""
@@ -119,6 +127,8 @@ erDiagram
     guest_profiles ||--o{ guest_interests : ""
     interests ||--o{ guest_interests : ""
     guest_profiles ||--o{ guest_preferred_times : ""
+    guest_profiles ||--o{ guest_preferred_categories : ""
+    experience_categories ||--o{ guest_preferred_categories : ""
 ```
 
 ## Catalogue and schedule
@@ -306,6 +316,8 @@ erDiagram
         text name
         date arrival_date
         date departure_date ">= arrival, <= 21 nights"
+        numeric activity_budget "nullable; 12,2; whole party"
+        char currency "INR"
     }
     itinerary_items {
         uuid id PK
@@ -346,3 +358,4 @@ stateDiagram-v2
 |------|---------|
 | `slot_availability` | Each slot with experience, category, seats left and effective price per guest. |
 | `experience_ratings` | Published review count and average rating per experience. |
+| `slot_readiness` | Per slot: staff assigned, resources confirmed or missing, the shared per-guest pool limit after overlapping holds and maintenance, `ready` and `bookable_seats`. LUXE-ECO matching uses it to check guides, venues and equipment. |

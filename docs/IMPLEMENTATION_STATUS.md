@@ -1,43 +1,62 @@
 # LUXE-ECO Implementation Status
 
-Last updated: 2026-10-29 (Phase 4: database design)
+The SOLACE resort website, built on LUXE-ECO, its experience-management system.
+
+Last updated: 2026-10-29 (SOLACE alignment with the project brief, after Phase 3 + 5)
 
 Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not started ·
 `[mock]` UI exists but uses placeholder data (not a working feature)
 
 ## Current state
 
-- Frontend pages exist for `/`, `/experiences`, `/experiences/[slug]`, `/preferences`,
-  `/itinerary`, `/dashboard`, `/my-bookings`, `/admin` and `/login`. All use sample data.
-- **No backend features work yet.** There's no auth or booking, and no page reads the
-  database yet. Nothing a visitor does reaches a server.
-- **Database design is done (Phase 4)**, verified offline and on local PostgreSQL, but not
-  yet applied to a Neon database (no credentials in this environment):
-  - Drizzle schema: 26 normalized tables and 2 views (`lib/db/schema/`).
-  - Migrations: `drizzle/0000_schema.sql` plus `0001_integrity.sql` (triggers and views).
-  - Development seed reusing the catalogue (`scripts/db/`), 16 queries in `sql/queries.sql`.
-  - See `docs/DATABASE_DESIGN.md` and `docs/ERD.md`.
-- What does work, entirely in the browser:
-  - Catalogue filtering and sorting (URL-synced).
-  - Rule-based matching (`lib/matching/score.ts`, a pure function ready for server reuse).
-  - Form validation.
-  - Preferences and itinerary drafts saved to `localStorage` (`lib/preview-store.ts`,
-    labelled "this browser only" in the UI).
-- Not possible yet: bookings, cancellations, sign-in, admin saves. These actions are disabled
-  or show a "not connected" message.
-- All sample data lives in one module: `lib/placeholder/catalogue.ts`. It holds 12
-  experiences, a deterministic 2–15 Nov 2026 session schedule (116 sessions) and 10 sample
-  bookings, with async accessors shaped like the future DAL.
-- Installed: `next@16.4.3`, `react@19.3.0`, Tailwind CSS v4, ESLint 9, TypeScript 5,
-  shadcn/ui dependencies (`radix-ui`, `class-variance-authority`, `clsx`, `tailwind-merge`,
-  `lucide-react`, `tw-animate-css`). Phase 4 added `drizzle-orm`, `@neondatabase/serverless`
-  and (dev) `drizzle-kit`, `tsx`, `@electric-sql/pglite`; `engines.node` is `>=22`.
-- Not installed yet: Clerk, Zod, test framework (Vitest).
-- `npm audit`: production dependencies clean. 4 moderate advisories are in an old `esbuild`
-  bundled inside dev-only `drizzle-kit` (its dev-server issue; drizzle-kit doesn't use it).
-- shadcn/ui registry (ui.shadcn.com) and photo hosts are blocked by this environment's
-  network policy. `components/ui/*` was written by hand to the shadcn new-york pattern,
-  and all imagery is generated placeholder illustration (`public/images/placeholder/`).
+- **SOLACE alignment (latest):**
+  - The site is branded SOLACE, and LUXE-ECO names the matching and planning system.
+  - Prices are in ₹ and times in IST.
+  - 18 experiences now cover the brief, including spa, kayaking, cycling, a local food
+    trail, a heritage village walk and a cabana.
+  - Matching only uses sessions with a guide, venue and shared equipment free (the
+    `slot_readiness` view).
+  - Guests can pick favourite categories, and plans take an activity budget with
+    day-by-day suggestions.
+  - See "SOLACE alignment" below. Signed-in pages for these features haven't been
+    viewed in a browser (no Clerk keys); they're covered by tests.
+- **Authentication and personalization are implemented, but not yet run against real
+  services.** No Clerk keys or Neon credentials exist in this environment, and clerk.com
+  is blocked by its network policy. Server logic is covered by automated tests (Clerk
+  session mocked, real migrations on PGlite). The real Clerk sign-in UI hasn't been
+  exercised. Setup: `docs/AUTHENTICATION.md`.
+- Without credentials the app **fails closed**. Protected routes redirect to `/login`,
+  which explains the missing variables, and Server Actions refuse with
+  `auth-unconfigured`. There's no bypass or fake user.
+- What reads and writes PostgreSQL (once configured):
+  - The guest area: `/dashboard`, `/recommendations`, `/itinerary`, `/preferences`,
+    `/my-bookings` and `/my-bookings/[reference]`.
+  - `/staff` and `/admin`.
+  - The "Add to my plan" button on experience pages.
+- **Still placeholder data:** the public catalogue (`/`, `/experiences`,
+  `/experiences/[slug]`) reads `lib/placeholder/catalogue.ts`. The DB seed holds the
+  same records, and a plan item resolves its DB session by experience + start time.
+- **Bookings can't be created yet** (Phase 6). "Online booking coming soon" stays
+  disabled. Bookings shown in the guest, staff and admin areas are the dev seed's sample
+  rows.
+- Removed this phase: `localStorage` drafts (`lib/preview-store.ts`), the preview login
+  forms, and `lib/matching/score.ts`. The new explainable engine replaces it.
+- Database design: 27 tables, 3 views, and migrations `0000`–`0004`:
+  - `0002`: a guest's last name is optional.
+  - `0003`: INR defaults, favourite categories and plan budgets.
+  - `0004`: the `slot_readiness` view.
+
+  Applied to PGlite only this round; not yet to Neon. See `docs/DATABASE_DESIGN.md` and
+  `docs/ERD.md`.
+- Installed, in addition to Phases 0–4: `@clerk/nextjs@7.9.22` and `zod@4.6.7`; dev
+  `vitest@5.0.5` and `@types/node@22`. `engines.node` is `>=22`.
+- `npm audit`: production dependencies clean (0). The 4 moderate dev-only advisories are
+  still in `drizzle-kit`'s bundled `esbuild`.
+- **Not deployed.** No Vercel project is connected. Local production server
+  (`next start`) verified in a browser; see the verification log.
+- Network limits: the shadcn/ui registry and photo hosts are blocked. `components/ui/*`
+  is hand-written to the shadcn new-york pattern, and imagery is generated placeholder
+  illustration.
 
 ## Phase 0: Project setup ✅
 
@@ -59,7 +78,8 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
 - [ ] Dark mode (not designed; `.dark` variant is opt-in only)
 - [x] Root layout metadata. Route groups `(public)`, `(guest)`, `(admin)`, `(auth)` share one
       header (transparent only over the landing hero; active links; guest-area menu; mobile
-      sheet) and footer. Guest and admin layouts mark where Phase 3 auth checks go.
+      sheet) and footer. Since Phase 3 the header shows account controls (sign in / account
+      menu with role links), rendered on the server inside `<Suspense>`.
 - [x] Replace starter page and unused `public/*.svg` assets
 - [ ] Replace placeholder illustrations with licensed resort photography
 - [ ] Connect Vercel preview deployments (git remote now exists: github.com/devi-1389/DBMS-Project)
@@ -74,42 +94,43 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
       price, date and step-free filters (sidebar, or sheet on mobile), sort, removable filter
       chips, empty state. Filters live in the URL.
 - [mock] `/experiences/[slug]`: banner, facts, highlights, related experiences, reviews empty
-      state. The planning panel has date/time picker (full sessions disabled), guest count,
-      price total and overlap warning. "Add to itinerary draft" works (browser only).
-      **"Online booking coming soon" is disabled.** Unknown slugs show a not-found page.
-- [mock] `/preferences`: interests, pace, budget, group size, time of day, access and notes,
-      with validation and focus on the first error. Live top-3 matches with reasons. Saved
-      in this browser only.
-- [mock] `/itinerary`: stay dates with validation, day-by-day plan, overlap and outside-stay
-      warnings, free-day links to the catalogue, estimate, and a confirm dialog to clear.
-      **"Request bookings" is disabled.** Items are badged "Not reserved".
-- [mock] `/dashboard`: stats, recommendations from saved preferences, up-next plan, and
-      bookings shown honestly as 0.
-- [mock] `/my-bookings`: empty state by default (no real bookings exist). A "Show sample
-      bookings" switch reveals labelled sample data: status tabs, table on desktop, cards on
-      mobile, cancel disabled.
-- [mock] `/admin`: overview stats and occupancy; sortable, searchable experiences table;
-      filterable, paginated schedule; sample bookings behind a switch. "New experience" form
-      validates but states nothing was created. **No access control yet.**
-- [mock] `/login`: sign-in and create-account tabs with validation and a password toggle.
-      Submitting shows "Sign-in isn't connected yet"; nothing is sent or stored.
+      state, planning panel (date/time, guests, total). Catalogue data is still placeholder.
+      "Add to my plan" now saves to the guest's plan in the DB (Phase 5).
+      **"Online booking coming soon" is disabled.**
+- `/preferences`, `/itinerary`, `/dashboard`, `/my-bookings`, `/admin`, `/login`: built
+  here with sample data, now DB-backed and protected (see Phases 3 and 5).
 - [x] Loading states (`loading.tsx` for catalogue, detail, guest area, admin; skeletons while
       browser data loads), empty states, and branded `not-found` pages
 - [ ] Booking review and payment steps (after the booking backend; Phase 6)
-- [ ] Staff area (schedule, assignments, check-in)
+- [~] Staff area: `/staff` schedule with guest manifests (Phase 5); check-in not started
 - [ ] Admin: staff, resources, payments, reviews screens
-- [ ] Error boundaries (`error.tsx`), to add with the first data that can fail
+- [x] Error boundaries (`error.tsx`) for the guest, staff and admin areas (`RouteError`)
 
 ## Phase 3: Authentication & authorization (Clerk)
 
-- [ ] Install Clerk, add env vars to `.env.example`, `ClerkProvider` in layout
-- [ ] `proxy.ts` with `clerkMiddleware` (optimistic route protection only)
-- [ ] Sign-in / sign-up: mount Clerk at `/login` (replace the preview forms; likely
-      `app/(auth)/login/[[...rest]]`)
-- [ ] Add `requireUser()` in `(guest)/layout.tsx` and `requireRole("admin")` in `(admin)/layout.tsx`
-- [ ] Move preferences and itinerary drafts from `localStorage` to the account
-- [ ] Role model (guest / staff / admin) and a server-side `requireRole()` helper
-- [ ] Session reads wrapped in `<Suspense>` (Cache Components)
+Code complete and tested with Clerk mocked; **not yet run with real Clerk keys**.
+
+- [x] `@clerk/nextjs` 7 installed. `ClerkProvider` is rendered only when both keys are
+      valid. Variable names are in `.env.example`; setup is in `docs/AUTHENTICATION.md`.
+- [x] `proxy.ts` with `clerkMiddleware`. It only sends an early sign-in redirect for
+      protected paths, and fails closed without keys.
+- [x] Clerk `<SignIn>` and `<SignUp>` at `/login/[[...login]]` and
+      `/sign-up/[[...sign-up]]` (in `<Suspense>`). Sign-out is in the account menu.
+- [x] Server-enforced areas for guest, staff and admin:
+      - Pages use `<Protected>` (`checkPageAccess`, with `connection()`).
+      - Actions use `authorizeAction()`, then the DAL checks.
+- [x] Accounts are linked to verified Clerk user IDs (`auth_identities`):
+      - Provisioned on first sign-in, from a verified primary email only.
+      - The webhook `/api/webhooks/clerk` (Svix-verified) syncs creates, updates and
+        deletes.
+      - Conflicting links are refused.
+- [x] Role model: `users.role` only, and new accounts are always guests.
+      - Admin-only role changes (`/admin` → Users) re-read the actor's role under a lock,
+        with no self-change and the last admin kept.
+      - The first admin comes from the operator script `npm run db:set-role`.
+- [x] Session reads inside `<Suspense>` (Cache Components). The header account area
+      streams in.
+- [~] Manual end-to-end sign-up and sign-in with a real Clerk dev instance: pending keys
 
 ## Phase 4: Database (Neon + Drizzle)
 
@@ -143,20 +164,81 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
       against production.
 - [~] Seed run against **Neon**: not done here (no credentials). Ran on PostgreSQL 16 and PGlite.
 - [x] `docs/ERD.md` (Mermaid; all 7 diagrams render), `docs/DATABASE_DESIGN.md`,
-      `sql/queries.sql` (16 queries)
+      `sql/queries.sql` (16 queries; 20 since the SOLACE alignment)
 - [x] Checks: `npm run db:verify` (offline, PGlite) and `npm run db:test:concurrency`
       (parallel psql sessions)
-- [ ] Set up Vitest (unit tests for `lib/money.ts`, matching, filters)
-- [ ] Link Clerk user ID ↔ users rows (table `auth_identities` is ready; webhook in Phase 3)
+- [x] Vitest set up (`npm test`), with unit tests and PGlite integration tests in `tests/`
+- [x] Link Clerk user ID ↔ users rows (Phase 3)
+- [x] Migration `0002_guest_last_name_optional.sql` (Clerk doesn't require a last name)
 
 ## Phase 5: Backend reads & matching
 
-- [ ] `server-only` data access layer (DAL) replacing placeholder data page by page
-- [ ] Ownership-scoped queries (guests see only their own data)
-- [ ] Guest preferences saved via Server Action (shape: `lib/types/guest.ts`; interests are
-      the tags in `lib/interests.ts`)
-- [~] Rule-based matching with reasons: implemented as a pure function and used in the UI;
-      unit tests pending (no test framework yet)
+- [x] `server-only` DAL (`lib/dal/`): identity, users, preferences, itinerary, bookings,
+      catalogue, staff and admin
+- [ ] Public catalogue pages on the DAL (still `lib/placeholder/catalogue.ts`)
+- [x] Ownership-scoped queries. Another guest's plans, items and bookings behave as "not
+      found"; staff see only their assigned sessions.
+- [x] Preferences in PostgreSQL via a Server Action. Zod strict schema; interest weights
+      1–5.
+- [x] Itinerary plans and items in PostgreSQL. Guests can create, rename, re-date and
+      delete plans, and add sessions, change guest counts and remove them.
+      - Validation covers: cancelled sessions, sessions already started, party too large,
+        not enough seats, outside the stay, and limits.
+      - Overlaps produce a warning. **Plans hold no seats** and are shown separately from
+        bookings.
+- [x] Recommendations from DB records:
+      - Filters: budget, dates, party size, time of day, availability and plan conflicts
+        (`/recommendations`, URL-synced).
+      - Each excluded experience gets a stated reason.
+      - Explainable factor scores, plus "suggested days" that save nothing until added.
+- [x] Booking detail page `/my-bookings/[reference]` (owner, assigned staff or admin)
+- [x] Staff schedule `/staff` with guest manifests (shortened names)
+
+## SOLACE alignment (project brief)
+
+Brief: *Guest → Preferences → Experience Matching → Resource Availability → Booking →
+Experience → Feedback*, across luxury, nature, adventure, wellness, local experiences,
+sustainability and resource sharing.
+
+- [x] Brand: SOLACE in the logo, titles, header, footer and landing copy. LUXE-ECO is
+      named as the system, and the landing page shows its flow and a "Shared, not
+      owned" pillar. "Local Culture" is now "Local Experiences".
+- [x] Locale: INR and en-IN (`₹15,000`, `₹1,00,000`), resort time Asia/Kolkata.
+      - Helpers `resortTime()` and `resortDayWindow()` build resort-local instants.
+      - Converted to them: sessions, seed windows, page date windows, SQL queries and
+        integrity checks.
+      - DB currency default is INR (`0003`).
+      - The zone is inferred from ₹; change `lib/config.ts` if the resort is elsewhere.
+- [mock] Catalogue: 6 new experiences, now 18 in total. Placeholder copy, prices and
+      generated illustrations.
+      - Signature Spa Ritual, Lake Kayak Expedition, Valley Cycle Trail, Inlet Food
+        Trail (local catch), Heritage Village Walk and Private Lakeside Cabana.
+      - Seed: 5 new staff leads, 5 new resources (shared kayaks, bicycles, binoculars,
+        spa suites, cabanas), new requirements, and a kayak maintenance window.
+- [x] Resource availability: the `slot_readiness` view (`0004`) reports, for each
+      session:
+      - The staff assigned, and the per-session holds (venue, boats, vehicle).
+      - How many more guests the shared per-guest pools can take after overlapping
+        holds and maintenance.
+
+      Recommendations skip sessions that can't run and cap places by equipment. Each
+      match says who leads it and what's confirmed. `addItem` and party-size changes
+      refuse with `slot-not-ready` or `not-enough-equipment`.
+- [x] Favourite categories (`guest_preferred_categories`): chosen on `/preferences`;
+      they're an explained scoring factor (3 points).
+- [x] Activity budget per plan (`itinerary_plans.activity_budget`): set in the plan
+      form; the itinerary shows what's left or over.
+- [x] Day-by-day planner (`lib/dal/planner.ts`):
+      - Fills each stay day with up to two non-overlapping sessions that can run.
+      - Matches of at least 50% only, preferred times first.
+      - Stays within the remaining budget and reports matches left out for budget.
+      - The brief's example (3 days, nature + adventure + luxury, ₹15,000, mornings)
+        is an integration test. It gives 5 sessions over 3 days for ₹11,200, with a
+        morning session each day.
+- [x] SQL examples Q17–Q20: readiness, shared pools, budgets, favourite categories.
+- [ ] Guest gear lending (borrow a bicycle or camera outside an experience): not
+      modelled yet; it would be a loan table with the same capacity trigger.
+- [ ] Booking and feedback steps of the brief: Phase 6 (bookings) and Phase 7 (reviews).
 
 ## Phase 6: Bookings (transactional)
 
@@ -167,9 +249,10 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
 
 ## Phase 7: Operations MVP
 
-- [ ] Admin CRUD: experiences, slots, resources, staff, user roles
+- [~] Admin: user role management done (Phase 3). CRUD for experiences, slots, resources
+      and staff not started; "New experience" still saves nothing.
 - [ ] Staff and resource assignment with overlap checks (transactional)
-- [ ] Staff manifest and check-in (completed / no_show)
+- [~] Staff manifest (read-only, Phase 5); check-in (completed / no_show) not started
 - [ ] Reviews (only for completed bookings, one per booking)
 - [ ] Manual (pay-at-resort) payment records
 
@@ -188,8 +271,9 @@ Status key: `[x]` done and verified · `[~]` in progress / partial · `[ ]` not 
 
 See "Missing decisions" in `docs/IMPLEMENTATION_PLAN.md` (payments, single vs
 multiple properties, stays, policies, timezone/currency, party details, images, email).
-The git remote is set up (`origin`, github.com/devi-1389/DBMS-Project). Next most useful step:
-a Neon development branch, so `db:migrate` and `db:seed` can run against Neon.
+The git remote is set up (`origin`, github.com/devi-1389/DBMS-Project). Next most useful steps:
+a Neon development branch and a Clerk development instance. Then run `db:migrate`, sign up
+once, run `db:set-role` for the first admin, and check the flows by hand.
 
 ## Verification log
 
@@ -212,6 +296,19 @@ a Neon development branch, so `db:migrate` and `db:seed` can run against Neon.
 | 2026-10-29 | 4     | Same seed, checks and queries on local PostgreSQL 16.15 (`pg` driver, scratch runner) | 47/47 checks, 16/16 queries |
 | 2026-10-29 | 4     | `npm run db:test:concurrency` on PostgreSQL 16 | Pass: 8 attempts on 3 seats → 3 booked, 5 `LXB01`; 30 on 7 → 7 booked, 23 `LXB01` |
 | 2026-10-29 | 4     | `db:migrate` / `db:seed` against Neon | Not run: no Neon credentials in this environment |
+| 2026-10-29 | 3+5   | `npx tsc --noEmit` / `npm run lint` | Pass |
+| 2026-10-29 | 3+5   | `npm test` (Vitest 5) | 77/77 pass: 35 unit (roles, routes, validation, matching, filters); 42 integration on PGlite (provisioning, role guards, preferences, plans, ownership, staff scope, DB recommendations, Server Actions, page guards, signed webhook) |
+| 2026-10-29 | 3+5   | Mutation check on tests | Making new accounts admin fails 4 tests; a non-strict preferences schema fails 3 |
+| 2026-10-29 | 3+5   | `npm run db:verify` / `npm run db:check` | 67/67 pass with migration 0002 / "Everything's fine" |
+| 2026-10-29 | 3+5   | `npm run build` | Pass. Protected pages, `/login` and `/sign-up` are partial prerenders; the webhook is dynamic. First attempt failed (`usePathname` outside `<Suspense>` on `/my-bookings/[reference]`); fixed. |
+| 2026-10-29 | 3+5   | Playwright on `next start` (no Clerk keys; ad hoc script, not in repo) | 33/33 pass: public pages 200; add-to-plan refused with a clear message; all 8 protected routes go to `/login?redirect_url=…` with no private data; raw 307; webhook 503; no overflow at 375px (fixed a pre-existing overflow on experiences with 14 session dates); no console errors |
+| 2026-10-29 | 3+5   | Real Clerk sign-up/sign-in, Neon reads/writes | Not run: no Clerk keys or Neon credentials here |
+| 2026-10-29 | SOLACE | `npx tsc --noEmit` / `npm run lint` | Pass |
+| 2026-10-29 | SOLACE | `npm test` | 96/96 pass. New: IST and ₹ formatting; readiness filtering and equipment caps; favourite-category factor; day planner (spread, budget, 50% minimum); validation of categories and budgets; DB readiness, equipment and guide checks; the brief's ₹15,000 three-day example |
+| 2026-10-29 | SOLACE | `npm run db:verify` / `npm run db:check` | 71/71 pass (migrations `0000`–`0004`, seed, 47 integrity checks, 4 money checks, 20 queries) / "Everything's fine" |
+| 2026-10-29 | SOLACE | `npm run build` | Pass (35 static/partial pages incl. 18 experience pages) |
+| 2026-10-29 | SOLACE | Playwright on `next start` (no Clerk keys; ad hoc scripts, not in repo) | 27/27 rebrand checks (SOLACE title and logo, LUXE-ECO copy, ₹ only, 18 experiences, 6 new detail pages, 7:00 am IST times, no overflow at 375px, no console errors) and 33/33 auth checks again |
+| 2026-10-29 | SOLACE | Signed-in pages (budget, categories, day planner) in a browser | Not run: needs Clerk keys. Logic covered by integration tests |
 
 Known Next 16 behaviour: the previous route stays mounted but hidden (`display: none`)
 for instant back navigation, so DOM queries in tests must ignore hidden elements.

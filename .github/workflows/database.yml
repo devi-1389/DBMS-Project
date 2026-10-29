@@ -1,0 +1,77 @@
+# Sets up and maintains the Neon database without a local computer.
+# GitHub → Actions → "Database (Neon)" → Run workflow, then pick a task.
+# Needs repository secrets DATABASE_URL and DATABASE_URL_UNPOOLED
+# (Settings → Secrets and variables → Actions). Secrets are never printed.
+name: Database (Neon)
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to do
+        type: choice
+        options:
+          - status
+          - migrate-and-seed
+          - migrate
+          - set-role
+        default: status
+      email:
+        description: "set-role only: the account's email (sign up on the website first)"
+        type: string
+        required: false
+      role:
+        description: "set-role only: the role to give"
+        type: choice
+        options:
+          - admin
+          - staff
+          - guest
+        default: admin
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database
+  cancel-in-progress: false
+
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Check the secrets are set
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$DATABASE_URL_UNPOOLED" ]; then
+            echo "::error::Add DATABASE_URL and DATABASE_URL_UNPOOLED in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Create or update the tables
+        if: inputs.task == 'migrate' || inputs.task == 'migrate-and-seed'
+        run: npm run db:migrate
+
+      - name: Load the sample data (experiences, sessions, staff, resources)
+        if: inputs.task == 'migrate-and-seed'
+        run: npm run db:seed
+
+      - name: Change a role
+        if: inputs.task == 'set-role'
+        env:
+          EMAIL: ${{ inputs.email }}
+          ROLE: ${{ inputs.role }}
+        run: npm run db:set-role -- "$EMAIL" "$ROLE"
+
+      - name: Database status
+        run: npm run db:status

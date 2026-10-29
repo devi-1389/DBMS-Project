@@ -78,7 +78,8 @@ export default async function ExperiencePage({ params }: PageProps<"/experiences
         <CategoryBadge category={experience.category} className="absolute top-5 left-5" />
       </div>
 
-      <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_24rem] lg:gap-16">
+      {/* minmax(0, 1fr) columns so the scrollable date strip can't widen the page on phones. */}
+      <div className="mt-10 grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-16">
         <div className="min-w-0">
           <p className="eyebrow text-gold-700">{experience.location}</p>
           <h1 className="mt-3 font-display text-4xl leading-[1.05] font-medium text-balance sm:text-6xl">
@@ -142,7 +143,7 @@ export default async function ExperiencePage({ params }: PageProps<"/experiences
           </section>
         </div>
 
-        <div className="lg:sticky lg:top-28 lg:self-start">
+        <div className="min-w-0 lg:sticky lg:top-28 lg:self-start">
           <BookingPanel experience={experience} slots={slots} />
         </div>
       </div>

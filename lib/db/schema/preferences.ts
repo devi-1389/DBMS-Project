@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, index, pgTable, primaryKey, smallint, text, uuid } from "drizzle-orm/pg-core";
 
+import { experienceCategories } from "./catalogue";
 import { currencyCode, money, updatedAt } from "./columns";
 import { difficulty, timeOfDay } from "./enums";
 import { guestProfiles } from "./identity";
@@ -59,6 +60,23 @@ export const guestInterests = pgTable(
     primaryKey({ name: "guest_interests_pkey", columns: [t.guestId, t.interestId] }),
     index("guest_interests_interest_idx").on(t.interestId),
     check("guest_interests_weight_range", sql`${t.weight} between 1 and 5`),
+  ],
+);
+
+/** Experience categories a guest loves, e.g. nature + adventure + luxury (M:N guest ↔ category). */
+export const guestPreferredCategories = pgTable(
+  "guest_preferred_categories",
+  {
+    guestId: uuid("guest_id")
+      .notNull()
+      .references(() => guestProfiles.userId, { onDelete: "cascade" }),
+    categoryId: smallint("category_id")
+      .notNull()
+      .references(() => experienceCategories.id, { onDelete: "restrict" }),
+  },
+  (t) => [
+    primaryKey({ name: "guest_preferred_categories_pkey", columns: [t.guestId, t.categoryId] }),
+    index("guest_preferred_categories_category_idx").on(t.categoryId),
   ],
 );
 

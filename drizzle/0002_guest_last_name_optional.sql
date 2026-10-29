@@ -1,0 +1,2 @@
+ALTER TABLE "guest_profiles" DROP CONSTRAINT "guest_profiles_name_length";--> statement-breakpoint
+ALTER TABLE "guest_profiles" ADD CONSTRAINT "guest_profiles_name_length" CHECK (char_length("guest_profiles"."first_name") between 1 and 80 and char_length("guest_profiles"."last_name") <= 80);

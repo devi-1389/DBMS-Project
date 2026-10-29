@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ROUTES, SECTION_IDS } from "@/lib/navigation";
 
-const pillars = ["Six curated categories", "Matched to how you travel", "Low-impact by design"];
+const pillars = ["Six experience worlds", "Matched to you by LUXE-ECO", "Shared, low-impact resources"];
 
 export function Hero() {
   return (
@@ -32,7 +32,7 @@ export function Hero() {
       />
 
       <div className="mx-auto w-full max-w-7xl px-6 pt-36 pb-20 sm:pb-28 lg:px-10">
-        <p className="eyebrow text-gold-300 motion-safe:animate-fade-up">Luxury · Nature · Adventure</p>
+        <p className="eyebrow text-gold-300 motion-safe:animate-fade-up">SOLACE · Luxury · Nature · Adventure</p>
         <h1
           id="hero-title"
           className="mt-6 max-w-4xl font-display text-5xl leading-[0.98] font-medium text-balance motion-safe:animate-fade-up motion-safe:[animation-delay:120ms] sm:text-7xl lg:text-8xl"

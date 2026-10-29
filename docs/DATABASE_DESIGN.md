@@ -1,8 +1,14 @@
 # LUXE-ECO Database Design
 
-Status: schema, migrations, seed and checks implemented (Phase 4). The app does **not**
-read from or write to the database yet: pages still use `lib/placeholder/catalogue.ts`
-until the data-access layer lands in Phase 5. Diagrams: [`ERD.md`](./ERD.md).
+LUXE-ECO is the experience-management system behind the **SOLACE** resort: guest
+preferences → experience matching → resource availability → booking → experience →
+feedback. This database holds every step of that flow.
+
+Status: schema, migrations, seed and checks implemented (Phase 4). Since Phases 3 and 5,
+the guest, staff and admin areas use it through the `server-only` DAL in `lib/dal/`
+(accounts, roles, preferences, itinerary plans, bookings, schedules); see
+[`AUTHENTICATION.md`](./AUTHENTICATION.md). The public catalogue pages still read
+`lib/placeholder/catalogue.ts`. Diagrams: [`ERD.md`](./ERD.md).
 Example queries: [`../sql/queries.sql`](../sql/queries.sql).
 
 ## 1. Technology choices
@@ -27,12 +33,15 @@ don't touch the database never need credentials.
 - **Names.** Snake case. Constraints and indexes are named explicitly (`<table>_<rule>`),
   so errors are readable and migrations are stable. All names fit PostgreSQL's
   63-character limit.
-- **Time.** Every instant is `timestamptz` (stored UTC). Stay dates are `date`. The resort
-  timezone is still an open decision (`lib/config.ts`).
+- **Time.** Every instant is `timestamptz` (stored UTC). Stay dates are `date`. SOLACE
+  runs on India Standard Time (`Asia/Kolkata`, `lib/config.ts`). The app converts resort
+  dates and times with `resortTime()` / `resortDayWindow()` (`lib/format.ts`), and SQL
+  groups days with `AT TIME ZONE 'Asia/Kolkata'`.
 - **Money.** `numeric(10,2)` for per-guest prices and budgets; `numeric(12,2)` for totals
   and payments. Never floating point. Drizzle returns these as strings, and
   `lib/money.ts` converts exactly to and from the app's integer minor units
-  (`"420.00"` ↔ `42000`). Each amount is stored with a `char(3)` ISO currency code.
+  (`"5500.00"` ↔ `550000` paise). Each amount is stored with a `char(3)` ISO currency
+  code; the default is `INR` (migration `0003`).
 - **Enums.** PostgreSQL enums for closed sets. `difficulty` reuses `lib/difficulty.ts`,
   and `booking_status` and `time_of_day` are type-checked against the app's types, so the
   app and database can't drift. Enum order is meaningful: `easy < moderate < challenging`.
@@ -50,12 +59,13 @@ don't touch the database never need credentials.
 |--------|-------|-----------------------|
 | Identity | `users` | Anyone who can sign in. Unique `lower(email)`; `role` (guest/staff/admin) is the source of truth for authorization. |
 | | `auth_identities` | Authentication-provider IDs (Clerk). Unique `(provider, provider_user_id)` and `(user_id, provider)`. |
-| | `guest_profiles` | Guest details, 1:1 with `users`. Name length, phone format, birth-date checks. |
+| | `guest_profiles` | Guest details, 1:1 with `users`. Name length, phone format, birth-date checks. Last name may be empty (migration `0002`). |
 | | `staff_members` | Staff, optionally linked to a user account (`user_id` unique, nullable). `is_active` for soft deactivation. |
 | Preferences | `interests` | Interest tags shared by guests and experiences. |
 | | `guest_preferences` | 1:1 scalar matching inputs: max difficulty, budget per guest (NULL = no limit), usual group size (1–12), step-free need, notes (≤ 500). |
 | | `guest_interests` | Weighted (1–5) M:N guest ↔ interest. |
 | | `guest_preferred_times` | Preferred times of day (multi-valued attribute in its own table). |
+| | `guest_preferred_categories` | Favourite experience categories (e.g. nature + adventure + luxury), M:N guest ↔ category (migration `0003`). |
 | Catalogue | `experience_categories` | The six categories, ordered. |
 | | `suppliers` | Operators, local hosts, rental firms, transport. |
 | | `experiences` | The catalogue: category (RESTRICT), optional supplier, difficulty, duration (15–1440 min), group size, `base_price`, step-free flag, `draft/published/archived` status. |
@@ -72,11 +82,18 @@ don't touch the database never need credentials.
 | | `experience_resource_requirements` | What each experience needs: `per_session` (fixed) or `per_guest` (× party size). |
 | | `resource_allocations` | Units held for a slot (session-level, `booking_id` NULL) or for one booking (per-guest equipment). Capacity enforced by trigger. |
 | | `resource_maintenance` | Units out of service for a window. Reduces what can be allocated. |
-| Itinerary | `itinerary_plans` | A guest's stay plan: arrival ≤ departure, ≤ 21 nights. |
+| Itinerary | `itinerary_plans` | A guest's stay plan: arrival ≤ departure, ≤ 21 nights, optional `activity_budget` (`numeric(12,2)` + currency, whole party; migration `0003`). |
 | | `itinerary_items` | Planned sessions (unique per plan and slot), optionally linked to the booking that fulfilled them. Plans are not reservations. |
 
-Views (created in `drizzle/0001_integrity.sql`, typed in `lib/db/schema/views.ts`):
-`slot_availability` (seats left and effective price) and `experience_ratings`.
+Views (typed in `lib/db/schema/views.ts`):
+
+- `slot_availability` (`0001`): seats left and effective price.
+- `experience_ratings` (`0001`): review count and average rating per experience.
+- `slot_readiness` (`0004`): whether each session can run. It reports the assigned
+  staff, the resources confirmed or missing, and how many more guests the shared
+  per-guest pools can take after overlapping holds and maintenance (`guest_limit`,
+  `limiting_resource`). It also gives `ready` and `bookable_seats`. LUXE-ECO matching and
+  `addItem` use it to check guides, venues and equipment, not just seats.
 
 ## 4. Normalization
 
@@ -233,8 +250,9 @@ their import:
 | `ExperienceSummary.interests` | `experience_interests` → `interests.slug` |
 | `ExperienceSummary.accessible` / `featured` | `is_step_free` / `is_featured` |
 | `ExperienceSlot.booked` | `experience_slots.seats_booked` |
-| `GuestPreferences` | `guest_preferences` + `guest_interests` + `guest_preferred_times` |
-| `ItineraryDraft` | `itinerary_plans` + `itinerary_items` (titles and prices by join, not copies) |
+| `ExperienceSlot.readiness` | `slot_readiness` (staff, resources, `bookable_seats`) |
+| `GuestPreferences` | `guest_preferences` + `guest_interests` + `guest_preferred_times` + `guest_preferred_categories` |
+| `ItineraryPlan` | `itinerary_plans` (incl. `activity_budget`) + `itinerary_items` (titles and prices by join, not copies) |
 | `BookingSummary.totalMinor` | `decimalToMinor(bookings.total_amount)` |
 
 ## 9. Seed data
@@ -242,15 +260,22 @@ their import:
 `npm run db:seed` loads development data in one transaction, without duplicating the
 frontend sample data:
 
-- **From the app:** experiences, highlights, interests, the 116-session schedule and the
-  10 sample bookings (`lib/placeholder/catalogue.ts`), plus category labels and copy and
-  the interest list (`lib/categories.ts`, `lib/placeholder/landing.ts`, `lib/interests.ts`).
+- **From the app:** 18 experiences (INR prices), highlights, interests, the 256-session
+  schedule (resort time, IST) and the 12 sample bookings (`lib/placeholder/catalogue.ts`).
+  Also category labels and copy and the interest list (`lib/categories.ts`,
+  `lib/placeholder/landing.ts`, `lib/interests.ts`).
 - **Seed-only** (`scripts/db/seed-data.ts`, marked PLACEHOLDER, example.com addresses):
-  4 suppliers, 8 staff, 9 resources and 11 requirements, 2 maintenance windows, 2
-  blackouts, the sample guest's preferences and itinerary, payments and a review.
-- **Result:** 9 users (admin, 2 staff accounts, 6 guests), 118 slots (incl. 2 past ones for
-  past bookings), 117 lead assignments, 82 resource holds, 10 bookings with automatic
-  status history, 5 payment attempts, 1 review, 1 itinerary plan with 3 items.
+  - 5 suppliers, 13 staff, 14 resources and 18 requirements.
+  - Shared pools: kayaks, bicycles, binoculars, the electric shuttle vans.
+  - 3 maintenance windows (incl. 4 kayaks out on 9 Nov) and 2 blackouts.
+  - The sample guest's preferences (incl. favourite categories) and their ₹30,000
+    itinerary, plus payments and a review.
+- **Result:**
+  - 11 users (admin, 2 staff accounts, 8 guests).
+  - 258 slots (incl. 2 past ones for past bookings), 257 lead assignments.
+  - 160 resource holds (157 per session, 3 per guest).
+  - 12 bookings with automatic status history, 6 payment attempts, 1 review.
+  - 1 itinerary plan with 3 items.
 - **Differences from the frontend sample:**
   - `seats_booked` starts at 0 and counts only seeded bookings. The catalogue's
     illustrative seat counts aren't real bookings.
@@ -270,7 +295,13 @@ TEST_DATABASE_URL=… npm run db:test:concurrency   # parallel booking race (psq
 npm run db:generate               # after editing lib/db/schema
 npm run db:check                  # migration consistency
 npm run db:studio                 # browse the database
+npm run db:set-role -- you@example.com admin   # bootstrap the first admin (account must exist)
+npm run db:status                 # read-only: connection, tables, migrations, row counts
 ```
+
+No local computer? GitHub → Actions → **Database (Neon)** runs `status`,
+`migrate-and-seed`, `migrate` or `set-role` with the repository secrets `DATABASE_URL` and
+`DATABASE_URL_UNPOOLED` (see `AUTHENTICATION.md`).
 
 The seed and migrate scripts refuse to run when `NODE_ENV` or `VERCEL_ENV` is
 `production`; `db:migrate --allow-production` is reserved for the release pipeline.
@@ -278,15 +309,20 @@ The scripts never print connection strings.
 
 ## 11. Limitations and next steps
 
-- **No app integration yet.** No page reads the database; `lib/db/index.ts` is unused
-  until Phase 5.
+- **Partial app integration.** The guest, staff and admin areas read and write through
+  `lib/dal/`. The public catalogue and booking creation (Phase 6) don't yet.
 - **Not run against Neon.** `db:migrate` and `db:seed` (Neon WebSocket driver) haven't run
   against a live Neon database because no credentials exist here. The same migrations,
   seed, checks and queries were verified on PostgreSQL 16 (via `pg`) and PostgreSQL 18
   (PGlite).
-- **Authorization is application-level** (Phase 3). Row-level security is a possible later
-  hardening step.
-- **Resort timezone and currency** are still placeholders (UTC / USD).
+- **Authorization is application-level** (Phase 3): `users.role` plus owner-scoped DAL
+  queries. Row-level security is a possible later hardening step.
+- **Resort timezone and currency** are set to IST and INR for SOLACE, inferred from the
+  project brief, which budgets in ₹. Change `lib/config.ts` (and the SQL `AT TIME ZONE`)
+  if the resort is elsewhere.
+- **Guest gear lending** (borrowing a bicycle or camera outside an experience) isn't
+  modelled yet. Pools are shared between experiences; lending would add a loan table
+  with the same capacity trigger.
 - Per-guest requirements are whole units per guest; ratios (one canoe per two guests) would
   need a `guests_per_unit` column.
 - Resource peaks are computed conservatively (pairwise overlap sum), not by an exact

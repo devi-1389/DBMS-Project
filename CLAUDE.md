@@ -1,10 +1,11 @@
 @AGENTS.md
 
-# LUXE-ECO
+# SOLACE · LUXE-ECO
 
-Integrated Luxury, Nature & Adventure Resort Experience Management System.
-Guests discover and book resort experiences; staff manage slots, resources and
-assignments; admins oversee payments, reviews and operations.
+Website of the SOLACE resort, built on LUXE-ECO (Integrated Luxury, Nature & Adventure
+Resort Experience Management System): guest preferences → matching → resource
+availability (staff, venues, shared equipment) → booking → experience → feedback.
+Brand the UI as SOLACE; LUXE-ECO names the matching/planning system.
 
 Plan: `docs/IMPLEMENTATION_PLAN.md`. Progress: `docs/IMPLEMENTATION_STATUS.md`.
 Read both before starting work, and update the status file at the end of every phase.
@@ -18,10 +19,10 @@ Read both before starting work, and update the status file at the end of every p
 - Vercel deployment
 
 Installed so far: Next.js, React, Tailwind, ESLint, TypeScript, shadcn/ui dependencies,
-Drizzle ORM + drizzle-kit, `@neondatabase/serverless`, and (dev) tsx and PGlite. Check
-`package.json` before assuming any other library exists.
+Drizzle ORM + drizzle-kit, `@neondatabase/serverless`, `@clerk/nextjs`, Zod 4, and (dev)
+tsx, PGlite and Vitest. Check `package.json` before assuming any other library exists.
 Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and is marked
-`// PLACEHOLDER`. Browser-only drafts use `lib/preview-store.ts`; never present them as bookings.
+`// PLACEHOLDER`. Itinerary plans are stored in the DB but hold no seats; never present them as bookings.
 
 ## Commands
 
@@ -29,9 +30,11 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
 - `npm run lint`: ESLint (flat config, `eslint.config.mjs`)
 - `npx tsc --noEmit`: type check
 - `npm run build`: production build (must pass before a phase is "done")
+- `npm test`: Vitest unit + PGlite integration tests (`tests/`)
 - `npm run db:verify`: offline DB check (migrations, seed, integrity checks, `sql/queries.sql`)
 - `npm run db:generate` after editing `lib/db/schema/`; `db:migrate` / `db:seed` need `.env.local`
-- Database design: `docs/DATABASE_DESIGN.md`, diagrams in `docs/ERD.md`
+- `npm run db:set-role -- <email> <role>`: operator-only role bootstrap (first admin)
+- Database design: `docs/DATABASE_DESIGN.md`, diagrams in `docs/ERD.md`. Auth: `docs/AUTHENTICATION.md`
 
 ## Next.js 16 specifics
 
@@ -49,8 +52,10 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
 - Build in phases: frontend first (static UI with clearly labelled placeholder
   data), then auth, then database, then backend features one at a time.
 - All database access is server-side only, in modules starting with
-  `import "server-only"` (planned: `lib/db/`, `lib/dal/`). Client components
+  `import "server-only"` (`lib/db/`, `lib/dal/`, `lib/auth/{clerk,viewer,guards}.ts`). Client components
   never import them.
+- Roles come only from `users.role` (new accounts are always guests). Pages gate with
+  `<Protected area>`, actions with `authorizeAction()`, and the DAL scopes by owner.
 - Secrets (`DATABASE_URL`, `CLERK_SECRET_KEY`, payment keys) are never prefixed
   with `NEXT_PUBLIC_`. Only the Clerk publishable key may be public.
   `.env*` is git-ignored. Keep `.env.example` with names only, no values.
@@ -61,11 +66,13 @@ Sample data lives only in `lib/placeholder/` (catalogue in `catalogue.ts`) and i
   resource/staff availability under a row lock or conditional update. Use the
   Neon WebSocket driver (`drizzle-orm/neon-serverless`) for transactions,
   because `neon-http` has no interactive transactions.
-- Schema lives in `lib/db/schema/` (normalized, 26 tables). Integrity rules Drizzle
-  can't express are triggers in `drizzle/0001_integrity.sql`; add new ones with
+- Schema lives in `lib/db/schema/` (normalized, 27 tables, 3 views). Rules Drizzle can't
+  express are triggers/views in custom migrations (`0001`, `0004`); add new ones with
   `drizzle-kit generate --custom`. Never edit a migration that has been applied.
 - Money: `numeric(10,2)`/`numeric(12,2)` plus currency code in the DB, integer minor
   units in the app; convert only with `lib/money.ts`. Times are `timestamptz` (UTC).
+- Resort locale is INR and IST (`lib/config.ts`). Build resort-local instants and day
+  windows with `resortTime()` / `resortDayWindow()` (`lib/format.ts`), never `…T00:00Z`.
 - Stay Vercel-compatible: no long-lived servers, local file writes or custom
   Node servers. Keep code Node runtime unless edge is required.
 

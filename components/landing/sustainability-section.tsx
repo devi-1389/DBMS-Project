@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Droplets, HandHeart, Sprout, Sun } from "lucide-react";
+import { ArrowRight, Backpack, Bike, Droplets, HandHeart, Sprout, Sun } from "lucide-react";
 
 import { SectionHeading } from "@/components/landing/section-heading";
 import { Button } from "@/components/ui/button";
 import { categoryHref, SECTION_IDS } from "@/lib/navigation";
 
-const ICONS = { sun: Sun, droplets: Droplets, sprout: Sprout, "hand-heart": HandHeart };
+const ICONS = { sun: Sun, droplets: Droplets, sprout: Sprout, "hand-heart": HandHeart, backpack: Backpack, bike: Bike };
 
 export function SustainabilitySection({
   pillars,
@@ -41,9 +41,9 @@ export function SustainabilitySection({
           <SectionHeading
             id="sustainability-title"
             tone="dark"
-            eyebrow="Sustainability"
+            eyebrow="Sustainability & shared resources"
             title="Luxury that gives back to the land"
-            description="Low-impact design runs through every stay and every experience, from how the lights stay on to who hosts your supper."
+            description="Low-impact design runs through every stay and every experience, from how the lights stay on and the gear you share to who hosts your supper."
           />
           <ul className="mt-12 grid gap-x-10 gap-y-9 sm:grid-cols-2">
             {pillars.map((pillar) => {

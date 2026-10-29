@@ -1,38 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { Info, Save, Sparkles } from "lucide-react";
 
+import { savePreferencesAction } from "@/app/actions/preferences";
 import { EmptyState } from "@/components/common/empty-state";
 import { QuantityInput } from "@/components/common/quantity-input";
 import { ToggleChip } from "@/components/common/toggle-chip";
-import { MatchCard, MatchListSkeleton } from "@/components/preferences/match-card";
+import { MatchCard } from "@/components/preferences/match-card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { CATEGORY_LABELS, EXPERIENCE_CATEGORIES } from "@/lib/categories";
 import { DIFFICULTIES, DIFFICULTY_LABELS, type Difficulty } from "@/lib/difficulty";
 import { formatPrice, formatTime } from "@/lib/format";
 import { INTERESTS } from "@/lib/interests";
-import { rankExperiences } from "@/lib/matching/score";
+import { defaultFilters } from "@/lib/matching/filters";
+import { recommendExperiences } from "@/lib/matching/recommend";
 import { ROUTES } from "@/lib/navigation";
-import {
-  BUDGET_OPTIONS,
-  DEFAULT_PREFERENCES,
-  GROUP_SIZE_LIMITS,
-  NOTES_MAX_LENGTH,
-  TIMES_OF_DAY,
-  validatePreferences,
-  type PreferencesErrors,
-} from "@/lib/preferences";
-import { preferencesStore, usePreviewStore } from "@/lib/preview-store";
+import { BUDGET_OPTIONS, GROUP_SIZE_LIMITS, NOTES_MAX_LENGTH, TIMES_OF_DAY } from "@/lib/preferences";
 import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
 import type { GuestPreferences } from "@/lib/types/guest";
 import { cn } from "@/lib/utils";
+import { preferencesSchema, toFieldErrors } from "@/lib/validation/schemas";
 
 const PACE_HINTS: Record<Difficulty, string> = {
   easy: "Gentle, mostly level and unhurried",
@@ -40,61 +34,91 @@ const PACE_HINTS: Record<Difficulty, string> = {
   challenging: "Long days and steep terrain",
 };
 
-type CatalogueProps = { experiences: ExperienceSummary[]; slots: ExperienceSlot[] };
+type PreferencesErrors = Partial<Record<string, string>>;
 
-export function PreferencesPlanner(props: CatalogueProps) {
-  const [stored, setStored] = usePreviewStore(preferencesStore);
+type PlannerProps = {
+  experiences: ExperienceSummary[];
+  slots: ExperienceSlot[];
+  /** Saved preferences, or defaults when the guest has none yet. */
+  initial: GuestPreferences;
+  saved: boolean;
+  /** Server time (ISO), so the live preview matches what the server would rank. */
+  now: string;
+};
 
-  if (stored === undefined) return <PreferencesSkeleton />;
-
-  return (
-    <PreferencesForm
-      // Re-initialise the draft from storage after each save or clear.
-      key={stored?.updatedAt ?? "unsaved"}
-      {...props}
-      initial={stored ?? DEFAULT_PREFERENCES}
-      saved={stored}
-      onSave={setStored}
-    />
-  );
+export function PreferencesPlanner(props: PlannerProps) {
+  // Re-initialise the draft after each save (the action refreshes the page data).
+  return <PreferencesForm key={props.initial.updatedAt ?? "new"} {...props} />;
 }
 
 const comparable = (preferences: GuestPreferences) => JSON.stringify({ ...preferences, updatedAt: null });
 
-function PreferencesForm({
-  experiences,
-  slots,
-  initial,
-  saved,
-  onSave,
-}: CatalogueProps & {
-  initial: GuestPreferences;
-  saved: GuestPreferences | null;
-  onSave: (value: GuestPreferences | null) => void;
-}) {
+function toInput(preferences: GuestPreferences) {
+  return {
+    interests: preferences.interests,
+    categories: preferences.categories,
+    interestWeights: preferences.interestWeights,
+    pace: preferences.pace,
+    budgetMaxMinor: preferences.budgetMaxMinor,
+    groupSize: preferences.groupSize,
+    timesOfDay: preferences.timesOfDay,
+    needsAccessibility: preferences.needsAccessibility,
+    notes: preferences.notes,
+  };
+}
+
+function PreferencesForm({ experiences, slots, initial, saved, now }: PlannerProps) {
   const [draft, setDraft] = useState(initial);
   const [errors, setErrors] = useState<PreferencesErrors>({});
-  const matches = useMemo(() => rankExperiences(experiences, slots, draft, 3), [experiences, slots, draft]);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const nowDate = useMemo(() => new Date(now), [now]);
+  const matches = useMemo(
+    () =>
+      recommendExperiences({
+        experiences,
+        slots,
+        preferences: draft,
+        filters: defaultFilters(draft, null, nowDate),
+        now: nowDate,
+        limit: 3,
+      }).recommendations,
+    [experiences, slots, draft, nowDate],
+  );
 
-  const dirty = saved ? comparable(draft) !== comparable(saved) : comparable(draft) !== comparable(DEFAULT_PREFERENCES);
+  const dirty = comparable(draft) !== comparable(initial);
   const update = (patch: Partial<GuestPreferences>) => {
     setDraft((current) => ({ ...current, ...patch }));
+    setFailure(null);
     setErrors((current) => {
       const next = { ...current };
-      for (const key of Object.keys(patch)) delete next[key as keyof PreferencesErrors];
+      for (const key of Object.keys(patch)) delete next[key];
       return next;
     });
   };
 
+  const focusFirst = (found: PreferencesErrors) => {
+    const first = Object.keys(found)[0];
+    if (first) document.getElementById(`pref-${first}`)?.focus();
+  };
+
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    const found = validatePreferences(draft);
-    setErrors(found);
-    if (Object.keys(found).length) {
-      document.getElementById(`pref-${Object.keys(found)[0]}`)?.focus();
+    const parsed = preferencesSchema.safeParse(toInput(draft));
+    if (!parsed.success) {
+      const found = toFieldErrors(parsed.error).fieldErrors;
+      setErrors(found);
+      focusFirst(found);
       return;
     }
-    onSave({ ...draft, updatedAt: new Date().toISOString() });
+    startTransition(async () => {
+      const result = await savePreferencesAction(parsed.data);
+      if (!result.ok) {
+        setErrors(result.fieldErrors ?? {});
+        setFailure(result.message);
+        focusFirst(result.fieldErrors ?? {});
+      }
+    });
   };
 
   return (
@@ -120,6 +144,31 @@ function PreferencesForm({
                 }
               >
                 {interest.label}
+              </ToggleChip>
+            ))}
+          </div>
+        </Section>
+
+        <Section
+          id="pref-categories"
+          title="Favourite kinds of experience"
+          description="Optional, e.g. nature + adventure + luxury. Favourites score higher; nothing is hidden."
+          error={errors.categories}
+        >
+          <div className="flex flex-wrap gap-2">
+            {EXPERIENCE_CATEGORIES.map((category) => (
+              <ToggleChip
+                key={category}
+                pressed={draft.categories.includes(category)}
+                onPressedChange={(on) =>
+                  update({
+                    categories: on
+                      ? [...draft.categories, category]
+                      : draft.categories.filter((item) => item !== category),
+                  })
+                }
+              >
+                {CATEGORY_LABELS[category]}
               </ToggleChip>
             ))}
           </div>
@@ -223,26 +272,29 @@ function PreferencesForm({
         </Section>
 
         <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-2xl border bg-card/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-          <p id="preferences-storage-note" aria-live="polite" className="text-sm text-muted-foreground">
-            {dirty
-              ? "Unsaved changes."
-              : saved?.updatedAt
-                ? `Saved in this browser at ${formatTime(saved.updatedAt)}.`
-                : "Not saved yet."}{" "}
-            Stored in this browser only, not in an account.
-          </p>
-          <div className="flex gap-2">
-            {saved && (
-              <Button type="button" variant="ghost" onClick={() => onSave(null)}>
-                Clear saved
-              </Button>
+          <div>
+            <p id="preferences-storage-note" aria-live="polite" className="text-sm text-muted-foreground">
+              {pending
+                ? "Saving…"
+                : dirty
+                  ? "Unsaved changes."
+                  : saved
+                    ? `Saved to your account${initial.updatedAt ? ` at ${formatTime(initial.updatedAt)}` : ""}.`
+                    : "Not saved yet."}
+            </p>
+            {failure && (
+              <p role="alert" className="mt-1 text-sm font-medium text-destructive">
+                {failure}
+              </p>
             )}
-            <Button type="button" variant="outline" onClick={() => setDraft(DEFAULT_PREFERENCES)} disabled={!dirty && !saved}>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" onClick={() => setDraft(initial)} disabled={!dirty || pending}>
               Reset
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={pending}>
               <Save />
-              Save preferences
+              {pending ? "Saving…" : "Save preferences"}
             </Button>
           </div>
         </div>
@@ -254,7 +306,7 @@ function PreferencesForm({
             <Sparkles className="size-5 text-gold-600" aria-hidden="true" />
             Your top matches
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">Updates as you choose, from the sample catalogue.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Updates as you choose, from sessions in our schedule.</p>
           <div className="mt-6" aria-live="polite">
             {draft.interests.length === 0 ? (
               <EmptyState
@@ -342,26 +394,5 @@ function OptionCard({ id, value, title, hint }: { id: string; value: string; tit
         {hint && <span className="text-xs leading-snug text-muted-foreground">{hint}</span>}
       </span>
     </Label>
-  );
-}
-
-function PreferencesSkeleton() {
-  return (
-    <div className="grid gap-10 lg:grid-cols-[1fr_24rem] lg:gap-14" role="status" aria-label="Loading preferences">
-      <div className="space-y-6">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="rounded-2xl border bg-card p-7">
-            <Skeleton className="h-7 w-48" />
-            <Skeleton className="mt-3 h-4 w-72" />
-            <div className="mt-6 flex flex-wrap gap-2">
-              {Array.from({ length: 6 }, (_, j) => (
-                <Skeleton key={j} className="h-10 w-28 rounded-full" />
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <MatchListSkeleton />
-    </div>
   );
 }

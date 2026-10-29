@@ -8,6 +8,7 @@ import { PgTable, type PgDatabase, type PgQueryResultHKT } from "drizzle-orm/pg-
 
 import { CATEGORY_LABELS, EXPERIENCE_CATEGORIES } from "@/lib/categories";
 import * as schema from "@/lib/db/schema";
+import { resortDayStart } from "@/lib/format";
 import { INTERESTS } from "@/lib/interests";
 import { minorToDecimal } from "@/lib/money";
 import { listExperiences, listSampleBookings, listSlots, SAMPLE_WINDOW } from "@/lib/placeholder/catalogue";
@@ -198,7 +199,7 @@ export async function seedDatabase(db: SeedDatabase, log: (message: string) => v
 
   // Past sample bookings (before the sample season) need sessions of their own.
   const pastSessions = sampleBookings
-    .filter((booking) => booking.startsAt < `${SAMPLE_WINDOW.start}T00:00:00.000Z`)
+    .filter((booking) => booking.startsAt < resortDayStart(SAMPLE_WINDOW.start).toISOString())
     .map((booking) => ({
       experienceSlug: booking.experienceSlug,
       startsAt: booking.startsAt,
@@ -411,6 +412,9 @@ export async function seedDatabase(db: SeedDatabase, log: (message: string) => v
   await db
     .insert(schema.guestPreferredTimes)
     .values(preferences.timesOfDay.map((timeOfDay) => ({ guestId: preferenceGuestId, timeOfDay })));
+  await db
+    .insert(schema.guestPreferredCategories)
+    .values(preferences.categories.map((category) => ({ guestId: preferenceGuestId, categoryId: categoryIds.get(category)! })));
 
   const [plan] = await db
     .insert(schema.itineraryPlans)
@@ -419,6 +423,7 @@ export async function seedDatabase(db: SeedDatabase, log: (message: string) => v
       name: data.itinerary.name,
       arrivalDate: data.itinerary.arrival,
       departureDate: data.itinerary.departure,
+      activityBudget: minorToDecimal(data.itinerary.activityBudgetMinor),
     })
     .returning({ id: schema.itineraryPlans.id });
   await db.insert(schema.itineraryItems).values(

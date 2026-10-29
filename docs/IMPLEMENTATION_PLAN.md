@@ -1,5 +1,7 @@
 # LUXE-ECO Implementation Plan
 
+For the SOLACE resort website. LUXE-ECO is its experience-management system.
+
 Status: draft, 2026-10-29. Progress is tracked in `IMPLEMENTATION_STATUS.md`.
 Rules are in `/CLAUDE.md`. Library versions checked on 2026-10-29: Next 16.4, React 19.3,
 `@clerk/nextjs` 7.x, `drizzle-orm` 0.45, `@neondatabase/serverless` 1.x, Zod 4, Vitest 5,
@@ -55,7 +57,7 @@ Components (shadcn primitives in `components/ui/`; feature components alongside)
 ## 2. Database schema
 
 > **Superseded by the implemented design:** see [`DATABASE_DESIGN.md`](./DATABASE_DESIGN.md)
-> and [`ERD.md`](./ERD.md) (26 tables). Notable changes from this draft: money is
+> and [`ERD.md`](./ERD.md) (27 tables, 3 views). Notable changes from this draft: money is
 > `numeric(10,2)` in the database (minor units only in the app), categories are a table,
 > and staff, resources, suppliers, itineraries and blackouts are fully modelled.
 
@@ -198,7 +200,7 @@ Admins can't lower a slot's capacity below `booked_count`; the database constrai
 2. Single resort or several properties? [single; adding `property_id` later is costly, so decide now]
 3. Are guest stays in scope, and can only in-house guests book? [stays post-MVP; open sign-up]
 4. Cancellation window, booking cutoff and refund rules? [cancel ≥ 24 h, book ≥ 2 h before]
-5. Resort timezone and currency? [one of each, set in config]
+5. ~~Resort timezone and currency?~~ Decided: INR and Asia/Kolkata (IST) for SOLACE, inferred from the brief's ₹ budgets (`lib/config.ts`).
 6. Does one booking cover a party with per-person details? [party size only in the MVP]
 7. Where experience images are stored? [external URLs, then Vercel Blob]
 8. Email provider; test database strategy [Neon test branch]; **git remote (still missing)**.

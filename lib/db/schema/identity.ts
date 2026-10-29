@@ -59,7 +59,8 @@ export const guestProfiles = pgTable(
   (t) => [
     check(
       "guest_profiles_name_length",
-      sql`char_length(${t.firstName}) between 1 and 80 and char_length(${t.lastName}) between 1 and 80`,
+      // Sign-up may provide only an email, so the last name can be empty.
+      sql`char_length(${t.firstName}) between 1 and 80 and char_length(${t.lastName}) <= 80`,
     ),
     check("guest_profiles_phone_format", sql`${t.phone} is null or ${t.phone} ~ '^\\+?[0-9 ()-]{6,20}$'`),
     check("guest_profiles_birth_date_range", sql`${t.dateOfBirth} is null or ${t.dateOfBirth} > date '1900-01-01'`),

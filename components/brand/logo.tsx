@@ -22,7 +22,7 @@ export function Logo({ className, markClassName }: { className?: string; markCla
   return (
     <Link
       href="/"
-      aria-label="LUXE-ECO home"
+      aria-label="SOLACE home"
       onClick={(event) => {
         // Already on the landing page: return to the top instead of a no-op navigation.
         if (window.location.pathname === "/") {
@@ -43,7 +43,7 @@ export function Logo({ className, markClassName }: { className?: string; markCla
         )}
       />
       <span className="font-display text-2xl font-semibold tracking-[0.2em]">
-        LUXE<span className="text-gold-400">·</span>ECO
+        SOLACE
       </span>
     </Link>
   );

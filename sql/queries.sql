@@ -1,6 +1,7 @@
--- LUXE-ECO: example DBMS queries over the seeded development data.
--- Each query starts with a "-- Qnn." header; `npm run db:verify` runs every one.
--- Times are stored as timestamptz (UTC). Sample season: 2026-11-02 to 2026-11-15.
+-- LUXE-ECO (the SOLACE resort's experience system): example DBMS queries over the
+-- seeded development data. Each query starts with a "-- Qnn." header; `npm run db:verify`
+-- runs every one. Times are stored as timestamptz (UTC); days are resort days in IST
+-- (Asia/Kolkata, +05:30). Prices are INR. Sample season: 2026-11-02 to 2026-11-15.
 
 -- Q01. Availability: open sessions with seats left on one day (uses the slot_availability view)
 SELECT experience_title,
@@ -11,8 +12,8 @@ SELECT experience_title,
        price_per_guest
   FROM slot_availability
  WHERE status = 'scheduled'
-   AND starts_at >= timestamptz '2026-11-03 00:00+00'
-   AND starts_at <  timestamptz '2026-11-04 00:00+00'
+   AND starts_at >= timestamptz '2026-11-03 00:00+05:30'
+   AND starts_at <  timestamptz '2026-11-04 00:00+05:30'
    AND seats_left > 0
  ORDER BY starts_at, experience_title;
 
@@ -104,8 +105,8 @@ SELECT st.display_name,
   JOIN experience_slots s ON s.id = a.slot_id
  WHERE a.status = 'assigned'
    AND s.status = 'scheduled'
-   AND s.starts_at >= timestamptz '2026-11-02 00:00+00'
-   AND s.starts_at <  timestamptz '2026-11-09 00:00+00'
+   AND s.starts_at >= timestamptz '2026-11-02 00:00+05:30'
+   AND s.starts_at <  timestamptz '2026-11-09 00:00+05:30'
  GROUP BY st.id, st.display_name, st.job_title
  ORDER BY hours DESC, st.display_name;
 
@@ -130,7 +131,7 @@ SELECT st.display_name,
 
 -- Q08. Busy pooled-resource days: peak units in use vs units available after maintenance (LATERAL subqueries)
 SELECT r.name AS resource,
-       (s.starts_at AT TIME ZONE 'UTC')::date AS day,
+       (s.starts_at AT TIME ZONE 'Asia/Kolkata')::date AS day,
        max(overlap.in_use) AS peak_units_in_use,
        r.quantity_total - coalesce(max(mt.out_of_service), 0) AS units_available,
        r.quantity_total
@@ -155,7 +156,7 @@ SELECT r.name AS resource,
  WHERE a.status = 'held'
    AND s.status <> 'cancelled'
    AND r.kind <> 'venue'                          -- single venues are always fully used
- GROUP BY r.id, r.name, r.quantity_total, (s.starts_at AT TIME ZONE 'UTC')::date
+ GROUP BY r.id, r.name, r.quantity_total, (s.starts_at AT TIME ZONE 'Asia/Kolkata')::date
 HAVING max(overlap.in_use) >= r.quantity_total - coalesce(max(mt.out_of_service), 0)
  ORDER BY day, resource;
 
@@ -238,7 +239,7 @@ SELECT title,
 
 -- Q15. A guest's itinerary with booking status and a running cost estimate (window SUM)
 SELECT p.name AS plan,
-       (s.starts_at AT TIME ZONE 'UTC')::date AS day,
+       (s.starts_at AT TIME ZONE 'Asia/Kolkata')::date AS day,
        e.title,
        i.party_size,
        coalesce(b.status::text, 'not booked') AS booking_status,
@@ -265,3 +266,63 @@ SELECT b.reference,
  WHERE b.status IN ('confirmed', 'completed')
  GROUP BY b.id
  ORDER BY balance_due DESC, b.reference;
+
+-- Q17. Resource availability: sessions that can't run, or that a shared equipment pool caps below their free seats (slot_readiness view)
+SELECT e.title,
+       (s.starts_at AT TIME ZONE 'Asia/Kolkata') AS starts_local,
+       s.capacity - s.seats_booked AS seats_left,
+       r.bookable_seats,
+       r.ready,
+       array_to_string(r.staff_names, ', ') AS staff,
+       coalesce(nullif(array_to_string(r.resources_missing, ', '), ''), r.limiting_resource) AS reason
+  FROM slot_readiness r
+  JOIN experience_slots s ON s.id = r.slot_id
+  JOIN experiences e ON e.id = s.experience_id
+ WHERE s.status = 'scheduled'
+   AND (NOT r.ready OR r.bookable_seats < s.capacity - s.seats_booked)
+ ORDER BY s.starts_at, e.title;
+
+-- Q18. Resource sharing: pooled resources that several experiences draw on (GROUP BY with HAVING)
+SELECT r.name AS resource,
+       r.kind,
+       r.quantity_total,
+       count(*) AS experiences_sharing,
+       string_agg(e.title || ' (' || er.basis || ' × ' || er.quantity || ')', '; ' ORDER BY e.title) AS used_by
+  FROM experience_resource_requirements er
+  JOIN resources r ON r.id = er.resource_id
+  JOIN experiences e ON e.id = er.experience_id
+ GROUP BY r.id, r.name, r.kind, r.quantity_total
+HAVING count(*) > 1
+ ORDER BY experiences_sharing DESC, resource;
+
+-- Q19. Activity budgets: each dated plan's estimate against its budget, with the share used (aggregate + CASE)
+SELECT p.name AS plan,
+       u.display_name AS guest,
+       p.arrival_date,
+       p.departure_date,
+       p.activity_budget,
+       coalesce(sum(coalesce(s.price_override, e.base_price) * i.party_size), 0) AS planned_estimate,
+       round(100 * coalesce(sum(coalesce(s.price_override, e.base_price) * i.party_size), 0) / nullif(p.activity_budget, 0), 1) AS pct_of_budget,
+       CASE WHEN coalesce(sum(coalesce(s.price_override, e.base_price) * i.party_size), 0) > p.activity_budget
+            THEN 'over budget' ELSE 'within budget' END AS status
+  FROM itinerary_plans p
+  JOIN users u ON u.id = p.guest_id
+  LEFT JOIN itinerary_items i ON i.plan_id = p.id
+  LEFT JOIN experience_slots s ON s.id = i.slot_id
+  LEFT JOIN experiences e ON e.id = s.experience_id
+ WHERE p.activity_budget IS NOT NULL
+ GROUP BY p.id, p.name, u.display_name, p.arrival_date, p.departure_date, p.activity_budget
+ ORDER BY pct_of_budget DESC NULLS LAST;
+
+-- Q20. Category matching: how many experiences in each of a guest's favourite categories are within their per-guest budget
+SELECT c.label AS favourite_category,
+       count(e.id) AS experiences,
+       count(e.id) FILTER (WHERE gp.budget_per_guest IS NULL OR e.base_price <= gp.budget_per_guest) AS within_budget
+  FROM guest_preferred_categories pc
+  JOIN users u ON u.id = pc.guest_id
+  JOIN guest_preferences gp ON gp.guest_id = pc.guest_id
+  JOIN experience_categories c ON c.id = pc.category_id
+  LEFT JOIN experiences e ON e.category_id = c.id AND e.status = 'published'
+ WHERE lower(u.email) = 'sample.guest@example.com'
+ GROUP BY c.id, c.label, c.sort_order
+ ORDER BY c.sort_order;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -16,13 +16,16 @@ import {
   Pencil,
   Search,
   SearchX,
+  ShieldCheck,
   Ticket,
+  UsersRound,
 } from "lucide-react";
+
+import { changeUserRoleAction } from "@/app/actions/admin";
 
 import { OccupancyBar, occupancyTone } from "@/components/admin/occupancy-bar";
 import { BookingsTable } from "@/components/bookings/bookings-table";
 import { EmptyState } from "@/components/common/empty-state";
-import { PreviewBadge } from "@/components/common/preview-notice";
 import { StatCard } from "@/components/common/stat-card";
 import { CategoryBadge } from "@/components/experiences/category-badge";
 import { Badge } from "@/components/ui/badge";
@@ -31,20 +34,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CATEGORY_LABELS, EXPERIENCE_CATEGORIES, type ExperienceCategory } from "@/lib/categories";
 import { formatDate, formatDateKey, formatDifficulty, formatDuration, formatPrice, formatTime, toDateKey } from "@/lib/format";
-import { experienceHref } from "@/lib/navigation";
+import { ROLE_LABELS, ROLES, type UserRole } from "@/lib/auth/roles";
+import { bookingHref, experienceHref } from "@/lib/navigation";
 import type { BookingSummary } from "@/lib/types/booking";
 import type { ExperienceSlot, ExperienceSummary } from "@/lib/types/experience";
+import type { ManagedUser } from "@/lib/types/user";
 import { cn } from "@/lib/utils";
 
 type ConsoleData = {
   experiences: ExperienceSummary[];
   slots: ExperienceSlot[];
   bookings: BookingSummary[];
+  users: ManagedUser[];
+  currentUserId: string;
+  windowDays: number;
 };
 
 export function AdminConsole(data: ConsoleData) {
@@ -67,6 +74,10 @@ export function AdminConsole(data: ConsoleData) {
           <Ticket />
           Bookings
         </TabsTrigger>
+        <TabsTrigger value="users">
+          <UsersRound />
+          Users
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="overview">
         <Overview {...data} />
@@ -80,13 +91,16 @@ export function AdminConsole(data: ConsoleData) {
       <TabsContent value="bookings">
         <BookingsPanel bookings={data.bookings} />
       </TabsContent>
+      <TabsContent value="users">
+        <UsersPanel users={data.users} currentUserId={data.currentUserId} />
+      </TabsContent>
     </Tabs>
   );
 }
 
 /* ---------------------------------------------------------------- overview */
 
-function Overview({ experiences, slots }: ConsoleData) {
+function Overview({ experiences, slots, windowDays }: ConsoleData) {
   const seats = slots.reduce((sum, slot) => sum + slot.capacity, 0);
   const booked = slots.reduce((sum, slot) => sum + slot.booked, 0);
   const full = slots.filter((slot) => slot.booked >= slot.capacity).length;
@@ -107,16 +121,21 @@ function Overview({ experiences, slots }: ConsoleData) {
     <div className="space-y-6">
       <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key figures">
         <li>
-          <StatCard icon={Compass} label="Published experiences" value={experiences.length} hint="Sample catalogue" />
+          <StatCard icon={Compass} label="Published experiences" value={experiences.length} hint="Live catalogue" />
         </li>
         <li>
-          <StatCard icon={CalendarDays} label="Sessions this season" value={slots.length} hint="2 to 15 November" />
+          <StatCard icon={CalendarDays} label="Scheduled sessions" value={slots.length} hint={`Next ${windowDays} days`} />
         </li>
         <li>
-          <StatCard icon={Gauge} label="Seat occupancy" value={`${Math.round((booked / seats) * 100)}%`} hint={`${booked} of ${seats} seats (sample)`} />
+          <StatCard
+            icon={Gauge}
+            label="Seat occupancy"
+            value={seats ? `${Math.round((booked / seats) * 100)}%` : "—"}
+            hint={`${booked} of ${seats} seats held`}
+          />
         </li>
         <li>
-          <StatCard icon={Ticket} label="Fully booked sessions" value={full} hint="Sample seat counts" />
+          <StatCard icon={Ticket} label="Fully booked sessions" value={full} hint="Confirmed and pending seats" />
         </li>
       </ul>
 
@@ -124,7 +143,7 @@ function Overview({ experiences, slots }: ConsoleData) {
         <Card>
           <CardHeader>
             <CardTitle className="font-display text-2xl">Occupancy by category</CardTitle>
-            <CardDescription>Share of seats booked across the season.</CardDescription>
+            <CardDescription>Share of seats held in the next {windowDays} days.</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="space-y-4">
@@ -344,9 +363,9 @@ function ExperiencesTable({ experiences, slots }: ConsoleData) {
                             <span className="sr-only">View {experience.title}</span>
                           </Link>
                         </Button>
-                        <Button variant="ghost" size="icon-sm" disabled title="Editing arrives with the database">
+                        <Button variant="ghost" size="icon-sm" disabled title="Editing arrives in a later phase">
                           <Pencil />
-                          <span className="sr-only">Edit {experience.title} (not available in preview)</span>
+                          <span className="sr-only">Edit {experience.title} (not available yet)</span>
                         </Button>
                       </div>
                     </TableCell>
@@ -358,7 +377,7 @@ function ExperiencesTable({ experiences, slots }: ConsoleData) {
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        {rows.length} of {experiences.length} experiences. Editing is disabled in the preview.
+        {rows.length} of {experiences.length} experiences. Editing arrives in a later phase.
       </p>
     </div>
   );
@@ -515,25 +534,109 @@ function ScheduleTable({ experiences, slots }: ConsoleData) {
 /* ---------------------------------------------------------------- bookings */
 
 function BookingsPanel({ bookings }: { bookings: BookingSummary[] }) {
-  const [showSample, setShowSample] = useState(false);
-
+  if (bookings.length === 0) {
+    return <EmptyState icon={Inbox} title="No bookings yet" description="Reservations appear here as soon as they are recorded." />;
+  }
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-4 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Switch id="admin-sample-bookings" checked={showSample} onCheckedChange={setShowSample} />
-          <Label htmlFor="admin-sample-bookings">Show sample bookings</Label>
-        </div>
-        {showSample && <PreviewBadge>Sample data, not reservations</PreviewBadge>}
+      <BookingsTable bookings={bookings} showGuest detailHref={(booking) => bookingHref(booking.reference)} caption="All bookings" />
+      <p className="text-xs text-muted-foreground">{bookings.length} bookings, latest session first (up to 200).</p>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- users */
+
+function UsersPanel({ users, currentUserId }: { users: ManagedUser[]; currentUserId: string }) {
+  return (
+    <div className="space-y-4">
+      <p className="flex items-start gap-2 rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-forest-700" aria-hidden="true" />
+        New accounts always start as guests. Only administrators can change roles, never their own, and the last
+        administrator can&apos;t be demoted. Every change is re-checked on the server.
+      </p>
+      <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
+        <Table>
+          <caption className="sr-only">User accounts and roles</caption>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Sign-in</TableHead>
+              <TableHead>Role</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="font-semibold">
+                  {user.displayName}
+                  {user.id === currentUserId && <span className="ml-2 text-xs font-normal text-muted-foreground">(you)</span>}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                <TableCell>
+                  <Badge variant={user.canSignIn ? "secondary" : "outline"}>{user.canSignIn ? "Linked" : "No login"}</Badge>
+                </TableCell>
+                <TableCell>
+                  <RoleControl user={user} isSelf={user.id === currentUserId} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
-      {showSample ? (
-        <BookingsTable bookings={bookings} showGuest caption="Sample bookings" />
-      ) : (
-        <EmptyState
-          icon={Inbox}
-          title="No bookings yet"
-          description="Bookings will appear here once guests can reserve online. Turn on sample bookings to review the layout."
-        />
+    </div>
+  );
+}
+
+function RoleControl({ user, isSelf }: { user: ManagedUser; isSelf: boolean }) {
+  const [role, setRole] = useState<UserRole>(user.role);
+  const [pending, startTransition] = useTransition();
+  const [feedback, setFeedback] = useState<{ ok: boolean; message?: string } | null>(null);
+  const id = `role-${user.id}`;
+
+  return (
+    <div className="flex min-w-64 flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <Label htmlFor={id} className="sr-only">
+          Role for {user.displayName}
+        </Label>
+        <NativeSelect
+          id={id}
+          value={role}
+          disabled={isSelf || pending}
+          onChange={(event) => {
+            setRole(event.target.value as UserRole);
+            setFeedback(null);
+          }}
+          className="w-36"
+        >
+          {ROLES.map((option) => (
+            <option key={option} value={option}>
+              {ROLE_LABELS[option]}
+            </option>
+          ))}
+        </NativeSelect>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={isSelf || pending || role === user.role}
+          onClick={() =>
+            startTransition(async () => {
+              const result = await changeUserRoleAction({ userId: user.id, role });
+              setFeedback(result.ok ? { ok: true, message: `Now ${ROLE_LABELS[role].toLowerCase()}.` } : result);
+              if (!result.ok) setRole(user.role);
+            })
+          }
+        >
+          {pending ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      {isSelf && <p className="text-xs text-muted-foreground">You can&apos;t change your own role.</p>}
+      {feedback && (
+        <p role={feedback.ok ? "status" : "alert"} className={cn("text-xs", feedback.ok ? "text-forest-700" : "text-destructive")}>
+          {feedback.message}
+        </p>
       )}
     </div>
   );
