@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+{% block title %}Interests | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Personalisation', 'What moves you?', 'Weights from 1 (not for me) to 5 (passionate) are stored in guest_preferences and drive 40% of every match score.',
+               [('Dashboard', url_for('guest.dashboard')), ('Interests', None)]) }}
+<section class="section-sm">
+    <div class="container" style="max-width: 980px;">
+        <form method="POST" action="{{ url_for('guest.preferences') }}">
+            {{ csrf_field() }}
+            <div class="row g-3">
+                {% for item in interests %}
+                <div class="col-md-6">
+                    <div class="card-lux card-pad h-100 reveal">
+                        <div class="d-flex gap-3">
+                            <div class="feature__icon"><i class="bi {{ item.icon }}"></i></div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h5 class="font-serif fs-4 mb-1">{{ item.name }}</h5>
+                                    <span class="tag tag-gold" id="out{{ item.interest_id }}"></span>
+                                </div>
+                                <p class="small text-muted mb-2">{{ item.description }}</p>
+                                <input type="range" class="form-range" min="1" max="5" step="1" name="interest_{{ item.interest_id }}" value="{{ item.current_weight }}"
+                                       data-output="#out{{ item.interest_id }}" data-labels="1 · Not for me|2 · Occasionally|3 · Neutral|4 · Keen|5 · Passionate" aria-label="{{ item.name }} weight">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <a href="{{ url_for('guest.dashboard') }}" class="btn btn-ghost">Back</a>
+                <button class="btn btn-gold btn-lg"><i class="bi bi-stars me-1"></i>Save & see my matches</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

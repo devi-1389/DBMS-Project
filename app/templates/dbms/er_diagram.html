@@ -1,0 +1,224 @@
+{% extends 'dbms/_layout.html' %}
+{% block title %}ER Diagram | SOLACE Database Explorer{% endblock %}
+{% block dbms_title %}Entity Relationship Diagram{% endblock %}
+{% block dbms_subtitle %}Generated from information_schema on every page load: {{ payload.tables|length }} entities and {{ payload.relationships|length }} foreign-key relationships. Scroll to zoom, drag to pan, click an entity for details.{% endblock %}
+{% block dbms_content %}
+<div class="row g-3 mb-3 align-items-end">
+    <div class="col-md-4">
+        <label class="form-label" for="focusTable">Focus on a table</label>
+        <select id="focusTable" class="form-select form-select-sm">
+            <option value="">All entities</option>
+            {% for t in payload.tables|sort(attribute='name') %}<option value="{{ t.name }}">{{ t.name }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="domainFilter">Domain</label>
+        <select id="domainFilter" class="form-select form-select-sm">
+            <option value="">All domains</option>
+            {% for d in payload.domains %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="detailLevel">Attributes</label>
+        <select id="detailLevel" class="form-select form-select-sm">
+            <option value="all">All attributes</option>
+            <option value="keys" selected>Keys only (PK / FK / UK)</option>
+            <option value="none">Entities only</option>
+        </select>
+    </div>
+    <div class="col-md-2"><button id="downloadSvg" class="btn btn-ghost btn-sm w-100"><i class="bi bi-download me-1"></i>Export SVG</button></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-9">
+        <div class="er-stage" id="erStage">
+            <div class="er-toolbar">
+                <button class="btn btn-ghost btn-icon" id="zoomIn" title="Zoom in"><i class="bi bi-zoom-in"></i></button>
+                <button class="btn btn-ghost btn-icon" id="zoomOut" title="Zoom out"><i class="bi bi-zoom-out"></i></button>
+                <button class="btn btn-ghost btn-icon" id="zoomFit" title="Fit to screen"><i class="bi bi-arrows-fullscreen"></i></button>
+            </div>
+            <div class="er-loading" id="erLoading"><span><span class="spinner-border spinner-border-sm me-2"></span>Rendering diagram…</span></div>
+            <div id="erCanvas" class="w-100 h-100"></div>
+        </div>
+        <div class="legend mt-3">
+            <span><code>||</code> exactly one</span><span><code>|o</code> zero or one</span><span><code>o{</code> zero or many</span><span><code>o|</code> zero or one (unique FK)</span>
+            <span>Solid line = identifying (FK is part of the child's PK) · dashed = non-identifying</span>
+            {% for d in payload.domains %}<span><span class="domain-dot" data-domain-dot="{{ d }}"></span> {{ d }}</span>{% endfor %}
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="card-lux" style="position: sticky; top: 90px;">
+            <div class="card-head"><h5 id="detailTitle">Entity details</h5></div>
+            <div class="card-pad small" id="detailBody">
+                <p class="text-muted mb-0">Click an entity in the diagram (or pick one in “Focus on a table”) to see its attributes and relationships.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card-lux mt-4">
+    <div class="card-head"><h5>Relationships & cardinalities</h5><span class="small text-muted">derived from foreign keys + unique indexes</span></div>
+    <div class="table-responsive" style="max-height: 420px;">
+        <table class="table table-lux">
+            <thead><tr><th>Parent (1)</th><th>Child</th><th>Foreign key</th><th>Type</th><th>Cardinality</th><th>ON DELETE</th></tr></thead>
+            <tbody>
+            {% for r in payload.relationships %}
+            <tr><td class="font-mono small">{{ r.parent_table }}.{{ r.parent_column }}</td><td class="font-mono small">{{ r.child_table }}</td>
+                <td class="font-mono small">{{ r.child_column }}</td><td>{{ r.type }}{% if r.identifying %} <span class="tag tag-gold">identifying</span>{% endif %}</td>
+                <td class="small">{{ r.cardinality }}</td><td><span class="tag tag-muted">{{ r.on_delete }}</span></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/mermaid/mermaid.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/svg-pan-zoom/svg-pan-zoom.min.js') }}"></script>
+<script>
+(function () {
+    const MODEL = {{ payload|tojson }};
+    const DOMAIN_COLORS = {
+        'Identity & Access': '#f3e3c3', 'Guest Preferences': '#e8dff5', 'Experience Catalogue': '#dcefe2',
+        'Scheduling & Resources': '#dcecef', 'Bookings & Payments': '#f6ddd2', 'Trip Planning': '#efe9d2', 'Other': '#eeeeee'
+    };
+    document.querySelectorAll('[data-domain-dot]').forEach((el) => { el.style.background = DOMAIN_COLORS[el.dataset.domainDot]; el.style.border = '1px solid #999'; });
+    const byName = Object.fromEntries(MODEL.tables.map((t) => [t.name, t]));
+    let panZoom = null, renderSeq = 0;
+
+    mermaid.initialize({
+        startOnLoad: false, securityLevel: 'strict', theme: 'base', maxTextSize: 200000,
+        themeVariables: { fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif', fontSize: '13px', primaryColor: '#ffffff',
+                          primaryBorderColor: '#1f4a36', lineColor: '#5d6b64', primaryTextColor: '#17221d', attributeBackgroundColorOdd: '#ffffff', attributeBackgroundColorEven: '#faf7f1' },
+        er: { useMaxWidth: false, entityPadding: 12, minEntityWidth: 90, layoutDirection: 'TB' }
+    });
+
+    function selectedTables() {
+        const focus = document.getElementById('focusTable').value;
+        const domain = document.getElementById('domainFilter').value;
+        let names = MODEL.tables.map((t) => t.name);
+        if (domain) names = names.filter((n) => byName[n].domain === domain);
+        if (focus) {
+            const set = new Set([focus]);
+            MODEL.relationships.forEach((r) => {
+                if (r.parent_table === focus) set.add(r.child_table);
+                if (r.child_table === focus) set.add(r.parent_table);
+            });
+            names = [...set];
+        } else if (domain) {
+            const set = new Set(names);   // include direct neighbours so relationships stay visible
+            MODEL.relationships.forEach((r) => {
+                if (set.has(r.parent_table) || set.has(r.child_table)) { set.add(r.parent_table); set.add(r.child_table); }
+            });
+            names = [...set];
+        }
+        return new Set(names);
+    }
+
+    function buildMermaid(tables, detail) {
+        const lines = ['erDiagram'];
+        tables.forEach((name) => {
+            const t = byName[name];
+            if (detail === 'none') { lines.push(`    ${name} { }`.replace('{ }', '')); return; }
+            const cols = t.columns.filter((c) => detail === 'all' || c.keys.length);
+            if (!cols.length) { lines.push(`    ${name}`); return; }
+            lines.push(`    ${name} {`);
+            cols.forEach((c) => {
+                const type = c.type.replace(/[^A-Za-z0-9_]/g, '');
+                const keys = c.keys.length ? ' ' + c.keys.join(', ') : '';
+                const note = c.keys.includes('FK') && c.references ? ` "→ ${c.references}"` : (c.nullable ? '' : ' "NOT NULL"');
+                lines.push(`        ${type} ${c.name}${keys}${note}`);
+            });
+            lines.push('    }');
+        });
+        MODEL.relationships.forEach((r) => {
+            if (!tables.has(r.parent_table) || !tables.has(r.child_table)) return;
+            const link = r.identifying ? '--' : '..';
+            lines.push(`    ${r.parent_table} ${r.parent_card}${link}${r.child_card} ${r.child_table} : "${r.child_column}"`);
+        });
+        return lines.join('\n');
+    }
+
+    function entityNameFromGroup(g) {
+        const label = g.querySelector('.er.entityLabel, text');
+        return label ? label.textContent.trim() : null;
+    }
+
+    function decorate(svg) {
+        svg.querySelectorAll('g[id^="entity-"]').forEach((g) => {
+            const name = entityNameFromGroup(g);
+            const t = byName[name];
+            if (!t) return;
+            const box = g.querySelector('rect');
+            if (box) { box.style.fill = DOMAIN_COLORS[t.domain] || '#fff'; box.style.stroke = '#1f4a36'; }
+            g.style.cursor = 'pointer';
+            g.addEventListener('click', (ev) => { ev.stopPropagation(); showDetails(name); });
+        });
+    }
+
+    function esc(s) { return window.solaceEscape(s == null ? '' : s); }
+
+    function showDetails(name) {
+        const t = byName[name];
+        if (!t) return;
+        document.getElementById('detailTitle').textContent = name;
+        const rels = MODEL.relationships.filter((r) => r.parent_table === name || r.child_table === name);
+        document.getElementById('detailBody').innerHTML = `
+            <span class="tag tag-gold mb-2">${esc(t.domain)}</span>
+            <p class="text-muted">${esc(t.description)}</p>
+            <div class="small-caps text-gold mb-1">Attributes (${t.columns.length})</div>
+            <ul class="list-unstyled mb-3">${t.columns.map((c) => `<li class="d-flex justify-content-between gap-2 border-bottom py-1">
+                <span class="font-mono">${esc(c.name)} ${c.keys.map((k) => `<span class="col-key key-${k.toLowerCase()}">${k}</span>`).join(' ')}</span>
+                <span class="text-muted font-mono">${esc(c.full_type)}${c.nullable ? '' : ' ·NN'}</span></li>`).join('')}</ul>
+            <div class="small-caps text-gold mb-1">Relationships (${rels.length})</div>
+            <ul class="list-unstyled mb-0">${rels.map((r) => `<li class="py-1">${r.parent_table === name
+                ? `has ${r.type === '1 : 1' ? 'one' : 'many'} <a href="#" data-goto="${r.child_table}">${esc(r.child_table)}</a> via <code>${esc(r.child_column)}</code>`
+                : `belongs to <a href="#" data-goto="${r.parent_table}">${esc(r.parent_table)}</a> (<code>${esc(r.child_column)}</code>, ${esc(r.cardinality)})`}</li>`).join('')}</ul>
+            <a class="btn btn-ghost btn-sm w-100 mt-3" href="{{ url_for('dbms.relational_schema') }}#t-${name}">Open in relational schema</a>`;
+        document.querySelectorAll('[data-goto]').forEach((a) => a.addEventListener('click', (e) => {
+            e.preventDefault(); document.getElementById('focusTable').value = a.dataset.goto; render(); showDetails(a.dataset.goto);
+        }));
+    }
+
+    async function render() {
+        const seq = ++renderSeq;
+        const loading = document.getElementById('erLoading');
+        loading.style.display = 'grid';
+        const tables = selectedTables();
+        const text = buildMermaid(tables, document.getElementById('detailLevel').value);
+        try {
+            const { svg } = await mermaid.render('erSvg' + seq, text);
+            if (seq !== renderSeq) return;
+            const canvas = document.getElementById('erCanvas');
+            if (panZoom) { panZoom.destroy(); panZoom = null; }
+            canvas.innerHTML = svg;
+            const svgEl = canvas.querySelector('svg');
+            const bb = svgEl.getBBox();
+            svgEl.setAttribute('viewBox', `${bb.x - 10} ${bb.y - 10} ${bb.width + 20} ${bb.height + 20}`);
+            svgEl.removeAttribute('style'); svgEl.setAttribute('width', '100%'); svgEl.setAttribute('height', '100%');
+            decorate(svgEl);
+            window.__solaceDiagramSvg = new XMLSerializer().serializeToString(svgEl);  // pristine copy for export
+            panZoom = svgPanZoom(svgEl, { zoomEnabled: true, controlIconsEnabled: false, fit: true, center: true, minZoom: 0.05, maxZoom: 12, zoomScaleSensitivity: 0.25 });
+        } catch (err) {
+            document.getElementById('erCanvas').innerHTML = `<div class="p-4 sql-error">Diagram could not be rendered: ${esc(err.message || err)}</div>`;
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+    ['focusTable', 'domainFilter', 'detailLevel'].forEach((id) => document.getElementById(id).addEventListener('change', () => {
+        render(); const f = document.getElementById('focusTable').value; if (f) showDetails(f);
+    }));
+    document.getElementById('zoomIn').addEventListener('click', () => panZoom && panZoom.zoomIn());
+    document.getElementById('zoomOut').addEventListener('click', () => panZoom && panZoom.zoomOut());
+    document.getElementById('zoomFit').addEventListener('click', () => { if (panZoom) { panZoom.resize(); panZoom.fit(); panZoom.center(); } });
+    document.getElementById('downloadSvg').addEventListener('click', () => {
+        if (!window.__solaceDiagramSvg) return;
+        const blob = new Blob([window.__solaceDiagramSvg], { type: 'image/svg+xml' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'solace_er_diagram.svg'; a.click();
+    });
+    window.addEventListener('resize', () => { if (panZoom) { panZoom.resize(); panZoom.fit(); panZoom.center(); } });
+    render();
+})();
+</script>
+{% endblock %}

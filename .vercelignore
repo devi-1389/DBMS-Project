@@ -1,0 +1,12 @@
+# Not needed by the deployed site (keeps the upload small and keeps secrets off Vercel)
+.env
+.env.*
+.venv
+venv
+__pycache__
+*.pyc
+tests
+tools
+docs
+app/static/uploads
+project_architecture_and_plan.md

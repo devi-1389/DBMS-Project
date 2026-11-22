@@ -1,0 +1,115 @@
+{% extends 'admin/_layout.html' %}
+{% from '_macros.html' import status_pill %}
+{% block title %}Resources & Maintenance | SOLACE Admin{% endblock %}
+{% block admin_content %}
+<div class="admin-title">
+    <div><span class="eyebrow">Inventory · CRUD</span><h1>Resources & maintenance</h1><p>Equipment, venues, vehicles and gear that experiences reserve per slot.</p></div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#mModal"><i class="bi bi-tools me-1"></i>Schedule maintenance</button>
+        <button class="btn btn-gold btn-sm" data-bs-toggle="modal" data-bs-target="#resModal" data-mode="new"><i class="bi bi-plus-lg me-1"></i>Add resource</button>
+    </div>
+</div>
+<div class="table-wrap mb-4">
+    <table class="table table-lux">
+        <thead><tr><th>Resource</th><th>Type</th><th>Supplier</th><th>Quantity</th><th>Upcoming reserved</th><th>Condition</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+        {% for r in resources %}
+        <tr>
+            <td><div class="cell-title">{{ r.name }}</div>{% if r.is_sustainable %}<span class="tag tag-eco mt-1"><i class="bi bi-leaf"></i>Sustainable</span>{% endif %}{% if r.eco_notes %}<div class="small text-muted mt-1">{{ r.eco_notes }}</div>{% endif %}</td>
+            <td class="small">{{ r.resource_type|title }}</td>
+            <td class="small">{{ r.supplier_name or '—' }}</td>
+            <td><strong>{{ r.total_quantity }}</strong><div class="small text-muted">used by {{ r.used_by_experiences }} exp.</div></td>
+            <td class="small">{{ r.upcoming_reserved }}</td>
+            <td>{{ status_pill(r.condition_status) }}</td>
+            <td class="text-end">
+                <div class="d-inline-flex gap-1">
+                    <button class="btn btn-ghost btn-icon" title="Edit" data-bs-toggle="modal" data-bs-target="#resModal" data-mode="edit"
+                            data-id="{{ r.resource_id }}" data-name="{{ r.name }}" data-type="{{ r.resource_type }}" data-qty="{{ r.total_quantity }}"
+                            data-condition="{{ r.condition_status }}" data-supplier="{{ r.supplier_id or '' }}" data-sustainable="{{ 1 if r.is_sustainable else 0 }}" data-notes="{{ r.eco_notes or '' }}"><i class="bi bi-pencil"></i></button>
+                    <form method="POST" action="{{ url_for('admin.resource_delete', resource_id=r.resource_id) }}" data-confirm="Delete {{ r.name }}?">{{ csrf_field() }}<button class="btn btn-danger-soft btn-icon" title="Delete"><i class="bi bi-trash"></i></button></form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card-lux">
+    <div class="card-head"><h5><i class="bi bi-tools text-gold me-1"></i>Maintenance periods</h5><span class="small text-muted">In-progress windows block bookings that need the resource</span></div>
+    <div class="table-responsive">
+        <table class="table table-lux">
+            <thead><tr><th>Resource</th><th>Window</th><th>Reason</th><th>Status</th><th class="text-end">Update</th></tr></thead>
+            <tbody>
+            {% for m in maintenance %}
+            <tr>
+                <td class="cell-title">{{ m.resource_name }}</td>
+                <td class="small">{{ m.start_datetime|date_format('%d %b %Y, %I:%M %p') }}<br>→ {{ m.end_datetime|date_format('%d %b %Y, %I:%M %p') }}</td>
+                <td class="small">{{ m.reason }}</td>
+                <td>{{ status_pill(m.status) }}</td>
+                <td class="text-end">
+                    {% if m.status != 'completed' %}
+                    <div class="d-inline-flex gap-1">
+                        {% if m.status == 'scheduled' %}
+                        <form method="POST" action="{{ url_for('admin.maintenance_status', maintenance_id=m.maintenance_id) }}">{{ csrf_field() }}<input type="hidden" name="status" value="in_progress"><button class="btn btn-ghost btn-sm">Start</button></form>
+                        {% endif %}
+                        <form method="POST" action="{{ url_for('admin.maintenance_status', maintenance_id=m.maintenance_id) }}">{{ csrf_field() }}<input type="hidden" name="status" value="completed"><button class="btn btn-forest btn-sm">Complete</button></form>
+                    </div>
+                    {% else %}<span class="small text-muted">Closed</span>{% endif %}
+                </td>
+            </tr>
+            {% else %}<tr><td colspan="5" class="text-center text-muted py-4">No maintenance recorded.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal fade" id="resModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered">
+    <form method="POST" id="resForm" action="{{ url_for('admin.resource_save') }}" class="modal-content" style="border-radius: var(--radius-lg);">
+        {{ csrf_field() }}
+        <div class="modal-header"><h5 class="modal-title font-serif fs-3" id="resTitle">Add resource</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body row g-2">
+            <div class="col-12"><label class="form-label">Name</label><input class="form-control" name="name" id="r_name" maxlength="120" required></div>
+            <div class="col-6"><label class="form-label">Type</label><select class="form-select" name="resource_type" id="r_type">{% for t in resource_types %}<option value="{{ t }}">{{ t|title }}</option>{% endfor %}</select></div>
+            <div class="col-6"><label class="form-label">Total quantity</label><input type="number" class="form-control" name="total_quantity" id="r_qty" min="0" value="1" required></div>
+            <div class="col-6"><label class="form-label">Condition</label><select class="form-select" name="condition_status" id="r_condition">{% for c in conditions %}<option value="{{ c }}">{{ c|replace('_', ' ')|title }}</option>{% endfor %}</select></div>
+            <div class="col-6"><label class="form-label">Supplier</label><select class="form-select" name="supplier_id" id="r_supplier"><option value="">None</option>{% for s in suppliers %}<option value="{{ s.supplier_id }}">{{ s.name }}</option>{% endfor %}</select></div>
+            <div class="col-12"><label class="form-label">Eco notes</label><input class="form-control" name="eco_notes" id="r_notes" maxlength="1000"></div>
+            <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" name="is_sustainable" id="r_sustainable" value="1" checked><label class="form-check-label" for="r_sustainable">Sustainable resource</label></div></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-gold">Save resource</button></div>
+    </form>
+</div></div>
+
+<div class="modal fade" id="mModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="{{ url_for('admin.maintenance_save') }}" class="modal-content" style="border-radius: var(--radius-lg);">
+        {{ csrf_field() }}
+        <div class="modal-header"><h5 class="modal-title font-serif fs-3">Schedule maintenance</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body row g-2">
+            <div class="col-12"><label class="form-label">Resource</label><select class="form-select" name="resource_id" required>{% for r in resources %}<option value="{{ r.resource_id }}">{{ r.name }}</option>{% endfor %}</select></div>
+            <div class="col-6"><label class="form-label">Start date</label><input type="date" class="form-control" name="start_date" required></div>
+            <div class="col-6"><label class="form-label">End date</label><input type="date" class="form-control" name="end_date" required></div>
+            <div class="col-12"><label class="form-label">Reason</label><textarea class="form-control" name="reason" rows="2" maxlength="1000" required></textarea></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-gold">Schedule</button></div>
+    </form>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('resModal').addEventListener('show.bs.modal', (e) => {
+    const b = e.relatedTarget || {}; const d = b.dataset || {};
+    const form = document.getElementById('resForm');
+    const edit = d.mode === 'edit';
+    document.getElementById('resTitle').textContent = edit ? 'Edit resource' : 'Add resource';
+    form.action = edit ? '{{ url_for('admin.resource_save') }}/' + d.id : '{{ url_for('admin.resource_save') }}';
+    document.getElementById('r_name').value = edit ? d.name : '';
+    document.getElementById('r_type').value = edit ? d.type : 'equipment';
+    document.getElementById('r_qty').value = edit ? d.qty : 1;
+    document.getElementById('r_condition').value = edit ? d.condition : 'excellent';
+    document.getElementById('r_supplier').value = edit ? d.supplier : '';
+    document.getElementById('r_notes').value = edit ? d.notes : '';
+    document.getElementById('r_sustainable').checked = edit ? d.sustainable === '1' : true;
+});
+</script>
+{% endblock %}

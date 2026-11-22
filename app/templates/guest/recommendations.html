@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, exp_image, empty_state %}
+{% block title %}Recommended For You | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('5-factor recommendation engine', 'Curated for you', 'Ranked by interest (40%), budget fit (25%), schedule (15%), sustainability (10%) and verified rating (10%). Remaining budget: ' ~ (remaining_budget|inr0) ~ '.',
+               [('Dashboard', url_for('guest.dashboard')), ('Recommendations', None)]) }}
+<section class="section-sm">
+    <div class="container">
+        <div class="d-flex flex-wrap gap-2 justify-content-end mb-3">
+            <a href="{{ url_for('guest.preferences') }}" class="btn btn-ghost btn-sm"><i class="bi bi-sliders me-1"></i>Adjust interests</a>
+            <a href="{{ url_for('guest.profile') }}" class="btn btn-ghost btn-sm"><i class="bi bi-wallet2 me-1"></i>Budget & dates</a>
+        </div>
+        {% if recommendations %}
+        <div class="row g-4">
+            {% for rec in recommendations %}
+            {% set e = rec.experience %}
+            <div class="col-lg-6">
+                <article class="card-lux hoverable overflow-hidden h-100 reveal">
+                    <div class="row g-0 h-100">
+                        <div class="col-sm-5 position-relative" style="min-height: 220px;">
+                            {{ exp_image(e, 'position-absolute w-100 h-100 object-fit-cover') }}
+                            <span class="tag tag-glass position-absolute" style="top: .8rem; left: .8rem;">#{{ loop.index }}</span>
+                        </div>
+                        <div class="col-sm-7 p-3 p-md-4 d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div>
+                                    <span class="small-caps text-gold">{{ e.category_name }}</span>
+                                    <h4 class="mb-1" style="line-height:1.15;"><a href="{{ url_for('experience.detail', slug=e.slug) }}" class="text-decoration-none text-forest">{{ e.name }}</a></h4>
+                                </div>
+                                <div class="score-ring" style="--p: {{ rec.match_score }};" title="Match score"><span>{{ rec.match_score|round(0)|int }}%</span></div>
+                            </div>
+                            <p class="small text-muted my-2">{{ rec.reason }}</p>
+                            <div class="d-grid gap-1 mb-3">
+                                {% for label, key in [('Interest', 'interest_score'), ('Budget', 'budget_score'), ('Schedule', 'schedule_score'), ('Sustainability', 'sustainability_score'), ('Rating', 'rating_score')] %}
+                                <div class="weight-bar" style="grid-template-columns: 95px 1fr 34px;"><span>{{ label }}</span><div class="progress-lux" style="height:6px;"><span data-width="{{ rec.breakdown[key] }}" style="width:0"></span></div><span>{{ rec.breakdown[key]|round(0)|int }}</span></div>
+                                {% endfor %}
+                            </div>
+                            <div class="mt-auto d-flex justify-content-between align-items-center pt-2 border-top">
+                                <div><div class="price" style="font-size:1.3rem;">{{ rec.estimated_cost|inr0 }}</div><div class="small text-muted">{{ rec.slot.slot_date|date_format('%a %d %b') }} · {{ rec.slot.start_time|time_format }}</div></div>
+                                <a href="{{ url_for('booking.book_slot', slot_id=rec.slot.slot_id) }}" class="btn btn-gold btn-sm">Book this session</a>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-lux">{{ empty_state('bi-stars', 'No eligible experiences right now', 'Every experience is either above your remaining budget, outside your party size limits or has no open sessions. Try increasing your budget.', url_for('guest.profile'), 'Update trip profile') }}</div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

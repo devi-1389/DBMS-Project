@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import status_pill %}
+{% block title %}Voucher {{ booking.booking_reference }} | SOLACE{% endblock %}
+{% block content %}
+<section class="section-sm">
+    <div class="container" style="max-width: 980px;">
+        <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+            <a href="{{ url_for('guest.my_bookings') if current_user.role == 'guest' else (url_for('admin.bookings') if current_user.role == 'admin' else url_for('staff.dashboard')) }}" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+            <button type="button" class="btn btn-forest btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print voucher</button>
+        </div>
+        <div class="voucher">
+            <div class="voucher__head d-flex flex-wrap justify-content-between gap-3 align-items-start">
+                <div>
+                    <span class="eyebrow on-dark">Official Experience Voucher</span>
+                    <h2 class="mt-2 mb-1">{{ booking.experience_name }}</h2>
+                    <div style="color: rgba(255,255,255,.75);"><i class="bi {{ booking.category_icon }} me-1"></i>{{ booking.category_name }}</div>
+                </div>
+                <div class="text-end">
+                    <div class="small-caps" style="color: var(--gold-300);">Reference</div>
+                    <div class="font-mono fs-5">{{ booking.booking_reference }}</div>
+                    <div class="mt-2">{{ status_pill(booking.booking_status) }}</div>
+                </div>
+            </div>
+            <div class="p-4">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="small-caps text-gold mb-2">Session</div>
+                        <dl class="kv">
+                            <dt>Date</dt><dd>{{ booking.slot_date|date_format('%A, %d %B %Y') }}</dd>
+                            <dt>Time</dt><dd>{{ booking.start_time|time_format }} – {{ booking.end_time|time_format }}</dd>
+                            <dt>Guests</dt><dd>{{ booking.party_size }}</dd>
+                            <dt>Lead guest</dt><dd>{{ booking.guest_name }}</dd>
+                            {% if staff %}<dt>Hosted by</dt><dd>{% for s in staff %}{{ s.full_name }}{% if not loop.last %}, {% endif %}{% endfor %}</dd>{% endif %}
+                        </dl>
+                        {% if booking.special_requests %}<div class="small mt-3"><strong>Special requests:</strong> <span class="text-muted">{{ booking.special_requests }}</span></div>{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small-caps text-gold mb-2">Payment</div>
+                        <dl class="kv">
+                            <dt>Total</dt><dd>{{ booking.total_amount|inr }}</dd>
+                            {% if booking.transaction_reference %}
+                            <dt>Transaction</dt><dd class="font-mono small">{{ booking.transaction_reference }}</dd>
+                            <dt>Method</dt><dd>{{ (booking.payment_method or '')|replace('_sim', '')|replace('_', ' ')|title }}</dd>
+                            <dt>Status</dt><dd>{{ status_pill(booking.payment_status) }}</dd>
+                            {% endif %}
+                            {% if booking.refund_amount and booking.refund_amount > 0 %}<dt>Refunded</dt><dd>{{ booking.refund_amount|inr }}</dd>{% endif %}
+                            <dt>Free cancellation</dt><dd>until {{ booking.cancellation_deadline|date_format('%d %b %Y, %I:%M %p') }}</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="divider"></div>
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="small-caps text-gold mb-2">Before you arrive</div>
+                        <p class="small mb-2"><i class="bi bi-shield-check text-forest me-1"></i>{{ booking.safety_instructions or 'A safety briefing is provided on arrival.' }}</p>
+                        <p class="small mb-2"><i class="bi bi-person-arms-up text-forest me-1"></i>{{ booking.age_restrictions or 'All ages welcome.' }}</p>
+                        <p class="small mb-0"><i class="bi bi-universal-access text-forest me-1"></i>{{ booking.accessibility_info or 'Contact the concierge for accessibility support.' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small-caps text-gold mb-2">Status history <span class="text-muted text-lowercase">(written by trigger)</span></div>
+                        <ul class="timeline">
+                            {% for h in history %}
+                            <li><strong>{{ (h.from_status or 'new')|title }} → {{ h.to_status|title }}</strong><br><span class="text-muted">{{ h.changed_at|date_format('%d %b %Y, %I:%M %p') }}{% if h.changed_by %} · by {{ h.changed_by }}{% endif %}</span></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% if current_user.role == 'guest' %}
+        <div class="d-flex flex-wrap gap-2 justify-content-center mt-4 no-print">
+            <a href="{{ url_for('guest.itinerary') }}" class="btn btn-ghost"><i class="bi bi-calendar-range me-1"></i>View itinerary</a>
+            <a href="{{ url_for('guest.recommendations') }}" class="btn btn-gold"><i class="bi bi-stars me-1"></i>Discover more for you</a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

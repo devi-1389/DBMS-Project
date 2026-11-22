@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stat, status_pill, empty_state, exp_image %}
+{% block title %}Guest Dashboard | SOLACE{% endblock %}
+{% block content %}
+<header class="page-header">
+    <div class="container">
+        <div class="row align-items-end g-4">
+            <div class="col-lg-8">
+                <span class="eyebrow on-dark">Guest portal</span>
+                <h1>Welcome back, {{ guest.full_name.split(' ')[0] }}.</h1>
+                <p><i class="bi bi-people me-1"></i>Party of {{ guest.party_size }} ·
+                    <i class="bi bi-calendar3 ms-2 me-1"></i>{% if guest.check_in_date and guest.check_out_date %}{{ guest.check_in_date|date_format }} – {{ guest.check_out_date|date_format }}{% else %}Flexible dates{% endif %} ·
+                    <i class="bi bi-sun ms-2 me-1"></i>Prefers {{ guest.preferred_time_of_day }}</p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <a href="{{ url_for('guest.preferences') }}" class="btn btn-ghost-light btn-sm me-1"><i class="bi bi-sliders me-1"></i>Interests</a>
+                <a href="{{ url_for('guest.profile') }}" class="btn btn-ghost-light btn-sm me-1"><i class="bi bi-person-gear me-1"></i>Trip profile</a>
+                <a href="{{ url_for('experience.catalogue') }}" class="btn btn-gold btn-sm"><i class="bi bi-compass me-1"></i>Book</a>
+            </div>
+        </div>
+    </div>
+</header>
+
+<section class="section-sm">
+    <div class="container">
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">{{ stat('bi-wallet2', 'Activity budget', total_budget|inr0, 'Set in your trip profile', 'gold') }}</div>
+            <div class="col-6 col-lg-3">{{ stat('bi-receipt', 'Committed', spent_amount|inr0, 'Confirmed + pending bookings') }}</div>
+            <div class="col-6 col-lg-3">{{ stat('bi-piggy-bank', 'Remaining', remaining_budget|inr0, 'Available for new experiences', 'sea') }}</div>
+            <div class="col-6 col-lg-3">{{ stat('bi-award', 'Experiences enjoyed', stats.completed or 0, (stats.reviews_written or 0)|string ~ ' review(s) written', 'terra') }}</div>
+        </div>
+        {% set pct = (100 * spent_amount / total_budget)|round(0) if total_budget else 0 %}
+        <div class="card-lux card-pad mb-4">
+            <div class="d-flex justify-content-between small mb-2"><span class="fw-semibold">Budget utilisation</span><span class="text-muted">{{ pct|int }}% of {{ total_budget|inr0 }}</span></div>
+            <div class="progress-lux"><span data-width="{{ [pct, 100]|min }}" style="width:0"></span></div>
+        </div>
+
+        {% if pending_payment %}
+        <div class="card-lux card-pad mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3" style="border-left: 4px solid var(--gold-500);">
+            <div><strong class="font-serif fs-5">Unpaid reservation</strong><div class="small text-muted">{{ pending_payment[0].experience_name }} · {{ pending_payment[0].slot_date|date_format }} · {{ status_pill(pending_payment[0].booking_status) }}</div></div>
+            <a href="{{ url_for('payment.payment_simulator', booking_id=pending_payment[0].booking_id) }}" class="btn btn-gold btn-sm">Complete payment</a>
+        </div>
+        {% endif %}
+        {% if pending_reviews %}
+        <div class="card-lux card-pad mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3" style="border-left: 4px solid var(--forest-500);">
+            <div><strong class="font-serif fs-5"><i class="bi bi-star-fill text-gold me-1"></i>Share your feedback</strong><div class="small text-muted">You completed <strong>{{ pending_reviews[0].experience_name }}</strong>. Verified reviews help future guests.</div></div>
+            <a href="{{ url_for('review.submit_review', booking_id=pending_reviews[0].booking_id) }}" class="btn btn-forest btn-sm">Write a review</a>
+        </div>
+        {% endif %}
+
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <div class="card-lux h-100">
+                    <div class="card-head"><h4><i class="bi bi-calendar-check me-2 text-gold"></i>Upcoming sessions</h4><a href="{{ url_for('guest.my_bookings') }}" class="small">All bookings</a></div>
+                    <div class="card-pad">
+                        {% if upcoming_bookings %}
+                        <div class="d-grid gap-3">
+                            {% for bk in upcoming_bookings %}
+                            <div class="d-flex gap-3 align-items-center">
+                                <div style="width: 92px; height: 68px; border-radius: 10px; overflow: hidden; flex: 0 0 92px;">{{ exp_image(bk, 'w-100 h-100 object-fit-cover') }}</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="fw-semibold text-forest text-truncate">{{ bk.experience_name }}</div>
+                                    <div class="small text-muted">{{ bk.slot_date|date_format('%a %d %b') }} · {{ bk.start_time|time_format }} · {{ bk.party_size }} guest{{ 's' if bk.party_size != 1 }}</div>
+                                </div>
+                                <a href="{{ url_for('payment.confirmation', booking_id=bk.booking_id) }}" class="btn btn-ghost btn-sm">Voucher</a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        {{ empty_state('bi-calendar-x', 'No upcoming sessions', 'Your personalised matches are a great place to start.', url_for('guest.recommendations'), 'See recommendations') }}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card-lux h-100">
+                    <div class="card-head"><h4><i class="bi bi-stars me-2 text-gold"></i>Top matches</h4><a href="{{ url_for('guest.recommendations') }}" class="small">View all</a></div>
+                    <div class="card-pad d-grid gap-3">
+                        {% for rec in recommendations %}
+                        <div class="d-flex gap-3 align-items-center">
+                            <div class="score-ring" style="--p: {{ rec.match_score }};"><span>{{ rec.match_score|round(0)|int }}%</span></div>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-semibold text-forest text-truncate">{{ rec.experience.name }}</div>
+                                <div class="small text-muted">{{ rec.estimated_cost|inr0 }} for your party · {{ rec.slot.slot_date|date_format('%d %b') }} {{ rec.slot.start_time|time_format }}</div>
+                            </div>
+                            <a href="{{ url_for('booking.book_slot', slot_id=rec.slot.slot_id) }}" class="btn btn-gold btn-sm">Book</a>
+                        </div>
+                        {% else %}
+                        {{ empty_state('bi-sliders', 'No matches yet', 'Adjust your interests or budget to activate recommendations.', url_for('guest.preferences'), 'Set interests') }}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card-lux h-100">
+                    <div class="card-head"><h4><i class="bi bi-calendar-range me-2 text-gold"></i>{{ itinerary.title if itinerary else 'Itinerary' }}</h4><a href="{{ url_for('guest.itinerary') }}" class="small">Open planner</a></div>
+                    <div class="card-pad">
+                        {% if itinerary_items %}
+                        <ul class="timeline">
+                            {% for it in itinerary_items[:6] %}
+                            <li><strong>Day {{ it.day_number }} · {{ it.time_block|title }}</strong> — {{ it.experience_name }} <span class="text-muted">({{ it.estimated_cost|inr0 }})</span></li>
+                            {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p class="text-muted mb-0">Your itinerary is empty. <a href="{{ url_for('guest.itinerary') }}">Start planning</a>.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="card-lux h-100">
+                    <div class="card-head"><h4><i class="bi bi-pie-chart me-2 text-gold"></i>Your experience mix</h4></div>
+                    <div class="card-pad">
+                        {% if category_mix %}
+                        {% set total = category_mix|sum(attribute='n') %}
+                        <div class="d-grid gap-2">
+                        {% for c in category_mix %}
+                            <div class="weight-bar" style="grid-template-columns: 150px 1fr 30px;"><span class="text-truncate">{{ c.name }}</span><div class="progress-lux"><span data-width="{{ (100 * c.n / total)|round(0) }}" style="width:0"></span></div><span>{{ c.n }}</span></div>
+                        {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted mb-0">Book an experience to see your mix across the six pillars.</p>
+                        {% endif %}
+                        <div class="divider"></div>
+                        <div class="d-flex justify-content-between small"><span class="text-muted">Total bookings</span><strong>{{ stats.total_bookings or 0 }}</strong></div>
+                        <div class="d-flex justify-content-between small"><span class="text-muted">Cancelled</span><strong>{{ stats.cancelled or 0 }}</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

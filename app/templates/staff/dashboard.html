@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stat, status_pill, empty_state %}
+{% block title %}Staff Duty Roster | SOLACE{% endblock %}
+{% block content %}
+<header class="page-header">
+    <div class="container d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+            <span class="eyebrow on-dark">Staff operations</span>
+            <h1>{{ staff.full_name }}</h1>
+            <p>{{ staff.specialization }} · {% if staff.is_available %}<span class="tag tag-eco">Available for new assignments</span>{% else %}<span class="tag tag-muted">Marked unavailable</span>{% endif %}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('staff.profile') }}" class="btn btn-ghost-light btn-sm"><i class="bi bi-person-gear me-1"></i>Profile & availability</a>
+            <a href="{{ url_for('staff.report_issue') }}" class="btn btn-gold btn-sm"><i class="bi bi-tools me-1"></i>Report equipment issue</a>
+        </div>
+    </div>
+</header>
+<section class="section-sm">
+    <div class="container">
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">{{ stat('bi-calendar-day', 'Sessions today', kpis.today_sessions or 0, None, 'gold') }}</div>
+            <div class="col-6 col-lg-3">{{ stat('bi-people', 'Guests today', kpis.guests_today or 0) }}</div>
+            <div class="col-6 col-lg-3">{{ stat('bi-calendar-week', 'Upcoming sessions', kpis.upcoming_sessions or 0, None, 'sea') }}</div>
+            <div class="col-6 col-lg-3">{{ stat('bi-check2-all', 'Completed', kpis.completed_sessions or 0, None, 'terra') }}</div>
+        </div>
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card-lux">
+                    <div class="card-head">
+                        <h4><i class="bi bi-list-check me-2 text-gold"></i>{{ 'Upcoming duties' if view == 'upcoming' else 'Duty history' }}</h4>
+                        <div class="chip-row">
+                            <a class="chip {% if view == 'upcoming' %}active{% endif %}" href="{{ url_for('staff.dashboard') }}">Upcoming</a>
+                            <a class="chip {% if view == 'history' %}active{% endif %}" href="{{ url_for('staff.dashboard', view='history') }}">History</a>
+                        </div>
+                    </div>
+                    {% if assignments %}
+                    <div class="table-responsive">
+                        <table class="table table-lux">
+                            <thead><tr><th>Session</th><th>Experience</th><th>Guest party</th><th>Status</th><th class="text-end">Action</th></tr></thead>
+                            <tbody>
+                            {% for a in assignments %}
+                            <tr>
+                                <td class="small"><strong>{{ a.slot_date|date_format('%a %d %b') }}</strong>{% if a.is_today %} <span class="tag tag-gold">Today</span>{% endif %}<br>{{ a.start_time|time_format }} – {{ a.end_time|time_format }}</td>
+                                <td><div class="cell-title">{{ a.experience_name }}</div><div class="small text-muted">{{ a.category_name }}</div></td>
+                                <td class="small">
+                                    {% if a.guest_name %}<strong>{{ a.guest_name }}</strong> · {{ a.party_size }} guest{{ 's' if a.party_size != 1 }}<br><span class="font-mono text-muted">{{ a.booking_reference }}</span>
+                                    {% if a.special_requests %}<div class="text-muted"><i class="bi bi-chat-left-dots me-1"></i>{{ a.special_requests }}</div>{% endif %}
+                                    {% if a.accessibility_notes and a.accessibility_notes != 'None' %}<div class="text-muted"><i class="bi bi-universal-access me-1"></i>{{ a.accessibility_notes }}</div>{% endif %}
+                                    {% else %}<span class="text-muted">—</span>{% endif %}
+                                </td>
+                                <td>{{ status_pill(a.booking_status or a.assignment_status) }}</td>
+                                <td class="text-end">
+                                    {% if a.booking_status == 'confirmed' and a.assignment_status in ('assigned', 'confirmed') %}
+                                    <form method="POST" action="{{ url_for('staff.complete_booking', booking_id=a.booking_id) }}" data-confirm="Mark this session as completed? The guest will be able to submit a verified review.">
+                                        {{ csrf_field() }}<button class="btn btn-forest btn-sm"><i class="bi bi-check2 me-1"></i>Complete</button>
+                                    </form>
+                                    {% elif a.booking_id %}
+                                    <a class="btn btn-ghost btn-sm" href="{{ url_for('payment.confirmation', booking_id=a.booking_id) }}">Details</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    {{ empty_state('bi-calendar2-check', 'No duties in this view', 'New assignments appear automatically when guests confirm bookings you are qualified and free to lead.') }}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="card-lux mb-4">
+                    <div class="card-head"><h5><i class="bi bi-box-seam me-2 text-gold"></i>Equipment for my sessions</h5></div>
+                    <div class="card-pad">
+                        {% for r in allocated_resources %}
+                        <div class="d-flex justify-content-between small py-1 border-bottom">
+                            <span><strong>{{ r.resource_name }}</strong><br><span class="text-muted">{{ r.slot_date|date_format('%d %b') }} · {{ r.start_time|time_format }}</span></span>
+                            <span class="text-end">× {{ r.quantity_allocated }}<br>{% if r.condition_status == 'under_maintenance' %}<span class="tag tag-muted">maintenance</span>{% endif %}</span>
+                        </div>
+                        {% else %}<p class="small text-muted mb-0">No equipment reserved for your upcoming sessions.</p>{% endfor %}
+                    </div>
+                </div>
+                <div class="card-lux">
+                    <div class="card-head"><h5><i class="bi bi-tools me-2 text-gold"></i>Open maintenance</h5></div>
+                    <div class="card-pad">
+                        {% for m in maintenance %}
+                        <div class="small py-1 border-bottom"><strong>{{ m.resource_name }}</strong> {{ status_pill(m.status) }}<br><span class="text-muted">{{ m.reason }}</span></div>
+                        {% else %}<p class="small text-muted mb-0">All equipment is in service.</p>{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

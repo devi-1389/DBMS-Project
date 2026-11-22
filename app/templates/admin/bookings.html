@@ -1,0 +1,52 @@
+{% extends 'admin/_layout.html' %}
+{% from '_macros.html' import status_pill, pagination %}
+{% block title %}Guest Bookings | SOLACE Admin{% endblock %}
+{% block admin_content %}
+<div class="admin-title">
+    <div><span class="eyebrow">Operations</span><h1>Guest bookings</h1><p>Status changes follow the booking state machine; every transition is written to booking_status_history by a trigger.</p></div>
+</div>
+<div class="chip-row mb-3">
+    <a class="chip {% if not active_filter %}active{% endif %}" href="{{ url_for('admin.bookings', q=q or None) }}">All <span class="count">{{ counts.values()|sum }}</span></a>
+    {% for s in ['pending', 'confirmed', 'completed', 'cancelled', 'failed'] %}
+    <a class="chip {% if active_filter == s %}active{% endif %}" href="{{ url_for('admin.bookings', status=s, q=q or None) }}">{{ s|title }} <span class="count">{{ counts.get(s, 0) }}</span></a>
+    {% endfor %}
+</div>
+<form class="filter-bar mb-3 d-flex gap-2" method="GET">
+    {% if active_filter %}<input type="hidden" name="status" value="{{ active_filter }}">{% endif %}
+    <input class="form-control form-control-sm" name="q" value="{{ q }}" placeholder="Search reference, guest name, email or experience" aria-label="Search bookings">
+    <button class="btn btn-forest btn-sm">Search</button>
+</form>
+<div class="table-wrap">
+    <table class="table table-lux">
+        <thead><tr><th>Reference</th><th>Guest</th><th>Experience & session</th><th>Party</th><th>Amount</th><th>Payment</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+        {% for b in bookings %}
+        <tr>
+            <td><a href="{{ url_for('payment.confirmation', booking_id=b.booking_id) }}" class="font-mono small">{{ b.booking_reference }}</a><div class="small text-muted">{{ b.created_at|date_format('%d %b %Y') }}</div></td>
+            <td class="small"><strong>{{ b.guest_name }}</strong><br><span class="text-muted">{{ b.guest_email }}</span></td>
+            <td class="small"><div class="cell-title">{{ b.experience_name }}</div>{{ b.slot_date|date_format('%a %d %b') }} · {{ b.start_time|time_format }}</td>
+            <td class="small">{{ b.party_size }}</td>
+            <td class="small"><strong>{{ b.total_amount|inr0 }}</strong>{% if b.refund_amount and b.refund_amount > 0 %}<br><span class="text-muted">refund {{ b.refund_amount|inr0 }}</span>{% endif %}</td>
+            <td class="small">{% if b.payment_status %}{{ status_pill(b.payment_status) }}<br><span class="text-muted">{{ (b.payment_method or '')|replace('_sim', '')|replace('_', ' ') }}</span>{% else %}—{% endif %}</td>
+            <td>{{ status_pill(b.booking_status) }}</td>
+            <td class="text-end">
+                {% set allowed = transitions.get(b.booking_status, []) %}
+                {% if allowed %}
+                <form method="POST" action="{{ url_for('admin.update_booking_status', booking_id=b.booking_id) }}" class="d-inline-flex gap-1" data-confirm="Apply this status change to {{ b.booking_reference }}?">
+                    {{ csrf_field() }}
+                    <select name="new_status" class="form-select form-select-sm" style="width: auto;" aria-label="New status">
+                        {% for t in allowed|sort %}<option value="{{ t }}">{{ 'Cancel & refund' if t == 'cancelled' and b.booking_status == 'confirmed' else t|title }}</option>{% endfor %}
+                    </select>
+                    <button class="btn btn-forest btn-sm">Apply</button>
+                </form>
+                {% else %}<span class="small text-muted">Final state</span>{% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No bookings match.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{{ pagination(page, total, page_size, 'admin.bookings') }}
+{% endblock %}

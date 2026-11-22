@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, stars, empty_state, exp_image %}
+{% block title %}My Reviews | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Verified feedback', 'My reviews', 'Edit or remove the reviews you have published.', [('Dashboard', url_for('guest.dashboard')), ('My reviews', None)]) }}
+<section class="section-sm">
+    <div class="container" style="max-width: 980px;">
+        {% if reviews %}
+        <div class="d-grid gap-3">
+            {% for r in reviews %}
+            <div class="card-lux card-pad d-flex flex-column flex-md-row gap-3">
+                <div style="width: 160px; height: 110px; border-radius: 12px; overflow: hidden; flex: 0 0 160px;">{{ exp_image(r, 'w-100 h-100 object-fit-cover') }}</div>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <a href="{{ url_for('experience.detail', slug=r.slug) }}" class="font-serif fs-4 text-forest text-decoration-none">{{ r.experience_name }}</a>
+                        <span>{{ stars(r.rating) }} {% if not r.is_approved %}<span class="tag tag-muted ms-1">Hidden by moderator</span>{% endif %}</span>
+                    </div>
+                    <strong>{{ r.review_title or 'Untitled review' }}</strong>
+                    <p class="small text-muted mb-2">{{ r.review_text }}</p>
+                    <div class="d-flex flex-wrap gap-2 align-items-center small">
+                        <span class="text-muted">{{ r.booking_reference }} · session {{ r.slot_date|date_format }}</span>
+                        <a href="{{ url_for('review.edit_review', review_id=r.review_id) }}" class="btn btn-ghost btn-sm ms-auto"><i class="bi bi-pencil me-1"></i>Edit</a>
+                        <form method="POST" action="{{ url_for('review.delete_review', review_id=r.review_id) }}" data-confirm="Delete this review permanently?">
+                            {{ csrf_field() }}<button class="btn btn-danger-soft btn-sm"><i class="bi bi-trash me-1"></i>Delete</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-lux">{{ empty_state('bi-star', 'No reviews yet', 'After staff mark a session as completed you can share a verified review.', url_for('guest.my_bookings'), 'My bookings') }}</div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

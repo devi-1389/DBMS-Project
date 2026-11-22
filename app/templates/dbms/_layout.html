@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<header class="page-header" style="padding-bottom: 4.2rem;">
+    <div class="container">
+        <span class="eyebrow on-dark">DBMS showcase · live from MySQL</span>
+        <h1>{% block dbms_title %}Database Explorer{% endblock %}</h1>
+        <p>{% block dbms_subtitle %}{% endblock %}</p>
+    </div>
+</header>
+<div class="container" style="margin-top: -2.2rem; position: relative; z-index: 3;">
+    <nav class="subnav" aria-label="Database Explorer sections">
+        <a href="{{ url_for('dbms.overview') }}" class="{% if active == 'overview' %}active{% endif %}"><i class="bi bi-grid-1x2"></i>Overview</a>
+        <a href="{{ url_for('dbms.er_diagram') }}" class="{% if active == 'er' %}active{% endif %}"><i class="bi bi-diagram-3"></i>ER Diagram</a>
+        <a href="{{ url_for('dbms.relational_schema') }}" class="{% if active == 'schema' %}active{% endif %}"><i class="bi bi-table"></i>Relational Schema</a>
+        <a href="{{ url_for('dbms.dfd') }}" class="{% if active == 'dfd' %}active{% endif %}"><i class="bi bi-bezier2"></i>DFD Level 0 / 1</a>
+        <a href="{{ url_for('dbms.sql_lab_page') }}" class="{% if active == 'sql' %}active{% endif %}"><i class="bi bi-terminal"></i>SQL Query Lab</a>
+        <a href="{{ url_for('dbms.tables') }}" class="{% if active == 'tables' %}active{% endif %}"><i class="bi bi-hdd-stack"></i>Table Viewer{% if not current_user or current_user.role != 'admin' %} <i class="bi bi-lock-fill lock"></i>{% endif %}</a>
+    </nav>
+</div>
+<section class="section-sm">
+    <div class="container">
+        {% block dbms_content %}{% endblock %}
+    </div>
+</section>
+{% endblock %}

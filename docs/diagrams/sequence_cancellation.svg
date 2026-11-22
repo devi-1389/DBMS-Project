@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .lifeline { stroke: #95a792; stroke-width: 1.5px; stroke-dasharray: 4,4; }
+      .obj-box { fill: #112d21; stroke: #c5a059; stroke-width: 1.5px; rx: 6px; }
+      .obj-txt { fill: #fcfbf7; font-weight: bold; font-size: 13px; text-anchor: middle; }
+      .msg-line { stroke: #2d6a4f; stroke-width: 2px; }
+      .ret-line { stroke: #c5a059; stroke-width: 2px; stroke-dasharray: 4,4; }
+      .msg-txt { font-size: 11px; font-weight: 600; fill: #1b2820; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: bold; fill: #112d21; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d6a4f"/>
+    </marker>
+    <marker id="ret-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c5a059"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="40" class="title-text">Sequence 4: Booking Cancellation, Resource Release &amp; Refund Flow</text>
+
+  <!-- Lifeline Headers -->
+  <g transform="translate(50, 70)">
+    <rect width="130" height="40" class="obj-box"/>
+    <text x="65" y="25" class="obj-txt">Guest (Browser)</text>
+    <line x1="65" y1="40" x2="65" y2="550" class="lifeline"/>
+  </g>
+
+  <g transform="translate(280, 70)">
+    <rect width="150" height="40" class="obj-box"/>
+    <text x="75" y="25" class="obj-txt">BookingController</text>
+    <line x1="75" y1="40" x2="75" y2="550" class="lifeline"/>
+  </g>
+
+  <g transform="translate(530, 70)">
+    <rect width="160" height="40" class="obj-box"/>
+    <text x="80" y="25" class="obj-txt">AvailabilityService</text>
+    <line x1="80" y1="40" x2="80" y2="550" class="lifeline"/>
+  </g>
+
+  <g transform="translate(790, 70)">
+    <rect width="130" height="40" class="obj-box"/>
+    <text x="65" y="25" class="obj-txt">MySQL Engine</text>
+    <line x1="65" y1="40" x2="65" y2="550" class="lifeline"/>
+  </g>
+
+  <!-- Messages -->
+  <!-- 1. POST /booking/cancel/<id> -->
+  <line x1="115" y1="130" x2="355" y2="130" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="130" y="122" class="msg-txt">1. POST /booking/cancel/&lt;booking_id&gt; (reason)</text>
+
+  <!-- 2. START TRANSACTION & Lock booking -->
+  <line x1="355" y1="170" x2="855" y2="170" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="370" y="162" class="msg-txt">2. START TRANSACTION; SELECT * FROM bookings FOR UPDATE</text>
+
+  <!-- 3. Verify Deadline Condition -->
+  <path d="M 355 200 C 395 200, 395 230, 355 230" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="400" y="220" class="msg-txt">3. Verify NOW() &lt;= cancellation_deadline (12h buffer)</text>
+
+  <!-- 4. Call release_booking_resources -->
+  <line x1="355" y1="260" x2="610" y2="260" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="370" y="252" class="msg-txt">4. release_booking_resources(cursor, booking_id)</text>
+
+  <!-- 5. Restore Slot Capacity -->
+  <line x1="610" y1="300" x2="855" y2="300" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="625" y="292" class="msg-txt">5. UPDATE slots SET booked_capacity = booked_capacity - party_size</text>
+
+  <!-- 6. Release Resource Allocations -->
+  <line x1="610" y1="340" x2="855" y2="340" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="625" y="332" class="msg-txt">6. UPDATE resource_allocations SET status = 'released'</text>
+
+  <!-- 7. Release Staff Assignments -->
+  <line x1="610" y1="380" x2="855" y2="380" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="625" y="372" class="msg-txt">7. UPDATE staff_assignments SET status = 'reassigned'</text>
+
+  <!-- 8. Update Booking & Payment -->
+  <line x1="355" y1="420" x2="855" y2="420" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="370" y="412" class="msg-txt">8. UPDATE bookings SET status='cancelled', refund_amount=total_amount</text>
+
+  <!-- 9. Trigger audit trail -->
+  <path d="M 855 440 C 900 440, 900 470, 855 470" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="740" y="460" class="msg-txt">9. Trigger: trg_booking_after_update</text>
+
+  <!-- 10. COMMIT -->
+  <line x1="355" y1="500" x2="855" y2="500" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="370" y="492" class="msg-txt">10. COMMIT TRANSACTION</text>
+
+  <!-- 11. Return to guest with refund notice -->
+  <line x1="355" y1="530" x2="115" y2="530" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="130" y="522" class="msg-txt">11. Flash Notice: "Booking cancelled. Full refund of ₹14,500 processed."</text>
+</svg>

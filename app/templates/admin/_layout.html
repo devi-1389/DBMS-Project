@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block footer %}{% endblock %}
+{% block content %}
+{% set ep = request.endpoint or '' %}
+<div class="admin-shell">
+    <aside class="admin-sidebar" aria-label="Administration">
+        <div class="side-label">Overview</div>
+        <a href="{{ url_for('admin.dashboard') }}" class="{% if ep == 'admin.dashboard' %}active{% endif %}"><i class="bi bi-speedometer2"></i>Dashboard</a>
+        <a href="{{ url_for('admin.reports') }}" class="{% if ep == 'admin.reports' %}active{% endif %}"><i class="bi bi-bar-chart-line"></i>Reports</a>
+        <div class="side-label">Operations</div>
+        <a href="{{ url_for('admin.bookings') }}" class="{% if ep == 'admin.bookings' %}active{% endif %}"><i class="bi bi-ticket-perforated"></i>Bookings</a>
+        <a href="{{ url_for('admin.schedules') }}" class="{% if ep == 'admin.schedules' %}active{% endif %}"><i class="bi bi-calendar3"></i>Schedules & Slots</a>
+        <a href="{{ url_for('admin.experiences') }}" class="{% if ep.startswith('admin.experience') %}active{% endif %}"><i class="bi bi-compass"></i>Experiences</a>
+        <a href="{{ url_for('admin.resources') }}" class="{% if ep == 'admin.resources' %}active{% endif %}"><i class="bi bi-box-seam"></i>Resources & Maintenance</a>
+        <div class="side-label">People</div>
+        <a href="{{ url_for('admin.staff_suppliers') }}" class="{% if ep == 'admin.staff_suppliers' %}active{% endif %}"><i class="bi bi-people"></i>Staff & Suppliers</a>
+        <a href="{{ url_for('admin.users') }}" class="{% if ep == 'admin.users' %}active{% endif %}"><i class="bi bi-person-lock"></i>User Accounts</a>
+        <a href="{{ url_for('admin.reviews') }}" class="{% if ep == 'admin.reviews' %}active{% endif %}"><i class="bi bi-chat-square-quote"></i>Review Moderation</a>
+        <div class="side-label">Governance</div>
+        <a href="{{ url_for('admin.audit_logs') }}" class="{% if ep == 'admin.audit_logs' %}active{% endif %}"><i class="bi bi-shield-check"></i>Audit Logs</a>
+        <a href="{{ url_for('dbms.overview') }}"><i class="bi bi-database"></i>Database Explorer</a>
+        <a href="{{ url_for('dbms.tables') }}"><i class="bi bi-table"></i>Table Viewer</a>
+    </aside>
+    <div class="admin-main">
+        {% block admin_content %}{% endblock %}
+    </div>
+</div>
+{% endblock %}

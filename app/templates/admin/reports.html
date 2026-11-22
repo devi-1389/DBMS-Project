@@ -1,0 +1,79 @@
+{% extends 'admin/_layout.html' %}
+{% from '_macros.html' import status_pill %}
+{% block title %}Analytics & Reports | SOLACE Admin{% endblock %}
+{% block admin_content %}
+<div class="admin-title">
+    <div><span class="eyebrow">Analytics</span><h1>Reports</h1><p>Generated from views (<code>v_sustainability_metrics</code>, <code>v_staff_workload</code>) and the stored procedure <code>sp_experience_occupancy</code>.</p></div>
+    <button type="button" class="btn btn-ghost btn-sm no-print" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print report</button>
+</div>
+
+<div class="card-lux mb-4">
+    <div class="card-head flex-wrap">
+        <h5>Occupancy by experience <span class="small text-muted font-sans">CALL sp_experience_occupancy('{{ date_from }}', '{{ date_to }}')</span></h5>
+        <form class="d-flex gap-2 no-print" method="GET">
+            <input type="date" class="form-control form-control-sm" name="date_from" value="{{ date_from }}" aria-label="From">
+            <input type="date" class="form-control form-control-sm" name="date_to" value="{{ date_to }}" aria-label="To">
+            <button class="btn btn-forest btn-sm">Run</button>
+        </form>
+    </div>
+    <div class="table-responsive"><table class="table table-lux">
+        <thead><tr><th>Experience</th><th>Slots</th><th>Capacity units</th><th>Booked units</th><th style="width: 30%;">Occupancy</th></tr></thead>
+        <tbody>{% for o in occupancy %}
+        <tr><td class="cell-title">{{ o.experience_name }}</td><td>{{ o.slots }}</td><td>{{ o.capacity_units }}</td><td>{{ o.booked_units }}</td>
+            <td><div class="d-flex align-items-center gap-2"><div class="progress-lux flex-grow-1"><span data-width="{{ o.occupancy_pct or 0 }}" style="width:0"></span></div><span class="small">{{ o.occupancy_pct if o.occupancy_pct is not none else '—' }}%</span></div></td></tr>
+        {% endfor %}</tbody>
+    </table></div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Category performance & sustainability</h5></div>
+            <div class="table-responsive"><table class="table table-lux">
+                <thead><tr><th>Category</th><th>Experiences</th><th>Low impact</th><th>Avg eco</th><th>Bookings</th><th class="text-end">Revenue</th></tr></thead>
+                <tbody>{% for c in cat_summary %}
+                <tr><td class="cell-title">{{ c.category_name }}</td><td>{{ c.total_experiences }}</td><td>{{ c.low_impact_experiences }}</td><td>{{ c.avg_eco_score }}</td><td>{{ c.total_bookings }}</td><td class="text-end fw-semibold">{{ c.total_category_revenue|inr0 }}</td></tr>
+                {% endfor %}</tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Top guests by spend <span class="small text-muted font-sans">GROUP BY … HAVING</span></h5></div>
+            <div class="card-pad">
+                {% for g in top_guests %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom small"><span><span class="avatar d-inline-grid me-2">{{ g.full_name[:1] }}</span>{{ g.full_name }}</span><span>{{ g.bookings }} booking(s) · <strong>{{ g.spend|inr0 }}</strong></span></div>
+                {% else %}<p class="text-muted small mb-0">No paid bookings yet.</p>{% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-6">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Resource utilisation</h5></div>
+            <div class="table-responsive"><table class="table table-lux">
+                <thead><tr><th>Resource</th><th>Type</th><th>Stock</th><th>Units reserved</th><th>Slots</th><th>Condition</th></tr></thead>
+                <tbody>{% for r in res_util %}<tr><td class="cell-title">{{ r.name }}</td><td class="small">{{ r.resource_type }}</td><td>{{ r.total_quantity }}</td><td>{{ r.total_times_allocated }}</td><td>{{ r.slots_used }}</td><td>{{ status_pill(r.condition_status) }}</td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-xl-6">
+        <div class="card-lux mb-4">
+            <div class="card-head"><h5>Staff workload</h5></div>
+            <div class="table-responsive"><table class="table table-lux">
+                <thead><tr><th>Staff member</th><th>Specialization</th><th>Active</th><th>Completed</th><th>Total</th></tr></thead>
+                <tbody>{% for s in staff_workload %}<tr><td class="cell-title">{{ s.full_name }}</td><td class="small">{{ s.specialization }}</td><td>{{ s.active_assignments }}</td><td>{{ s.completed_assignments }}</td><td><strong>{{ s.total_assignments }}</strong></td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div>
+        <div class="card-lux">
+            <div class="card-head"><h5>Payments by method & status</h5></div>
+            <div class="table-responsive"><table class="table table-lux">
+                <thead><tr><th>Method</th><th>Status</th><th>Count</th><th class="text-end">Amount</th></tr></thead>
+                <tbody>{% for p in payment_mix %}<tr><td>{{ p.payment_method|replace('_sim', '')|replace('_', ' ')|title }}</td><td>{{ status_pill(p.payment_status) }}</td><td>{{ p.n }}</td><td class="text-end">{{ p.amount|inr0 }}</td></tr>{% endfor %}</tbody>
+            </table></div>
+        </div>
+    </div>
+</div>
+{% endblock %}

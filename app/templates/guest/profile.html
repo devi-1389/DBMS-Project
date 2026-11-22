@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+{% block title %}Trip Profile | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Guest profile', 'Your trip profile', 'Party size, budget, dates and time preference feed directly into recommendations and the itinerary planner.',
+               [('Dashboard', url_for('guest.dashboard')), ('Profile', None)]) }}
+<section class="section-sm">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="card-lux card-pad text-center">
+                    <span class="avatar avatar-lg mx-auto mb-3">{{ guest.full_name[:1] }}</span>
+                    <h4 class="mb-0">{{ guest.full_name }}</h4>
+                    <div class="text-muted small">{{ guest.email }}</div>
+                    <div class="divider"></div>
+                    <dl class="kv text-start">
+                        <dt>Member since</dt><dd>{{ guest.member_since|date_format }}</dd>
+                        <dt>Eco priority</dt><dd>{{ guest.sustainability_priority|title }}</dd>
+                        <dt>Guest ID</dt><dd class="font-mono">#{{ guest.guest_id }}</dd>
+                    </dl>
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{{ url_for('guest.preferences') }}" class="btn btn-ghost btn-sm"><i class="bi bi-sliders me-1"></i>Interest weights</a>
+                        <a href="{{ url_for('auth.change_password') }}" class="btn btn-ghost btn-sm"><i class="bi bi-key me-1"></i>Change password</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <form method="POST" action="{{ url_for('guest.profile') }}" class="card-lux card-pad">
+                    {{ csrf_field() }}
+                    <h4 class="mb-3">Personal details</h4>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label" for="full_name">Full name</label><input class="form-control" id="full_name" name="full_name" value="{{ guest.full_name }}" maxlength="120" required></div>
+                        <div class="col-md-6"><label class="form-label" for="phone">Phone</label><input class="form-control" id="phone" name="phone" value="{{ guest.phone or '' }}" maxlength="30"></div>
+                    </div>
+                    <div class="divider"></div>
+                    <h4 class="mb-3">Trip settings</h4>
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label" for="party_size">Party size</label><input type="number" class="form-control" id="party_size" name="party_size" min="1" max="25" value="{{ guest.party_size }}" required></div>
+                        <div class="col-md-8"><label class="form-label" for="budget">Activity budget (₹)</label><input type="number" class="form-control" id="budget" name="budget" min="0" step="500" value="{{ guest.budget|int }}" required></div>
+                        <div class="col-md-6"><label class="form-label" for="check_in_date">Check-in</label><input type="date" class="form-control" id="check_in_date" name="check_in_date" value="{{ guest.check_in_date or '' }}"></div>
+                        <div class="col-md-6"><label class="form-label" for="check_out_date">Check-out</label><input type="date" class="form-control" id="check_out_date" name="check_out_date" value="{{ guest.check_out_date or '' }}"></div>
+                        <div class="col-md-6"><label class="form-label" for="preferred_time_of_day">Preferred time of day</label>
+                            <select class="form-select" id="preferred_time_of_day" name="preferred_time_of_day">
+                                {% for v in ['any', 'morning', 'afternoon', 'evening'] %}<option value="{{ v }}" {% if guest.preferred_time_of_day == v %}selected{% endif %}>{{ 'Flexible' if v == 'any' else v|title }}</option>{% endfor %}
+                            </select></div>
+                        <div class="col-md-6"><label class="form-label" for="sustainability_priority">Sustainability priority</label>
+                            <select class="form-select" id="sustainability_priority" name="sustainability_priority">
+                                {% for v in ['high', 'medium', 'low'] %}<option value="{{ v }}" {% if guest.sustainability_priority == v %}selected{% endif %}>{{ v|title }}</option>{% endfor %}
+                            </select></div>
+                        <div class="col-12"><label class="form-label" for="accessibility_notes">Accessibility notes</label><textarea class="form-control" id="accessibility_notes" name="accessibility_notes" rows="3" maxlength="1000">{{ guest.accessibility_notes or '' }}</textarea>
+                            <div class="form-hint">Shared with the staff leading your sessions.</div></div>
+                    </div>
+                    <div class="text-end mt-4"><button class="btn btn-gold">Save profile</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

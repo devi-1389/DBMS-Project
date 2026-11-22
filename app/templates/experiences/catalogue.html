@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import exp_card, empty_state, page_header %}
+{% block title %}Experience Catalogue | SOLACE{% endblock %}
+{% block content %}
+{% set active_cat = (categories|selectattr('slug', 'equalto', active_category)|first) if active_category else None %}
+{{ page_header('Sanctuary collection', active_cat.name if active_cat else 'Curated resort experiences',
+               active_cat.description if active_cat else 'Bespoke luxury, biodiversity, adventure, Ayurvedic healing, living heritage and zero-emission exploration - all bookable in real time.',
+               [('Home', url_for('index')), ('Experiences', None)]) }}
+
+<section class="section-sm">
+    <div class="container">
+        <div class="chip-row mb-4">
+            <a href="{{ url_for('experience.catalogue', q=search_query or None, sort=active_sort if active_sort != 'recommended' else None) }}" class="chip {% if not active_category %}active{% endif %}">All <span class="count">{{ categories|sum(attribute='experience_count') }}</span></a>
+            {% for cat in categories %}
+            <a href="{{ url_for('experience.catalogue', category=cat.slug, q=search_query or None, sort=active_sort if active_sort != 'recommended' else None) }}" class="chip {% if active_category == cat.slug %}active{% endif %}"><i class="bi {{ cat.icon }}"></i>{{ cat.name }} <span class="count">{{ cat.experience_count }}</span></a>
+            {% endfor %}
+        </div>
+
+        <form method="GET" action="{{ url_for('experience.catalogue') }}" class="filter-bar mb-4">
+            {% if active_category %}<input type="hidden" name="category" value="{{ active_category }}">{% endif %}
+            <div class="row g-2 align-items-end">
+                <div class="col-lg-4">
+                    <label class="form-label" for="q">Search</label>
+                    <div class="input-group"><span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="search" class="form-control" id="q" name="q" placeholder="Kayak, spa, pottery…" value="{{ search_query }}"></div>
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="max_price">Max price (₹)</label>
+                    <input type="number" min="0" step="100" class="form-control" id="max_price" name="max_price" value="{{ max_price }}" placeholder="Any">
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="date">Available on</label>
+                    <input type="date" class="form-control" id="date" name="date" value="{{ on_date.isoformat() if on_date else '' }}">
+                </div>
+                <div class="col-6 col-lg-2">
+                    <label class="form-label" for="sort">Sort by</label>
+                    <select class="form-select" id="sort" name="sort">
+                        {% for v, l in [('recommended', 'Curated order'), ('price_asc', 'Price: low to high'), ('price_desc', 'Price: high to low'), ('rating', 'Guest rating'), ('eco', 'Eco-impact score'), ('duration', 'Shortest first')] %}
+                        <option value="{{ v }}" {% if active_sort == v %}selected{% endif %}>{{ l }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-lg-2 d-flex gap-2">
+                    <button type="submit" class="btn btn-gold flex-grow-1">Apply</button>
+                    {% if search_query or max_price or on_date or eco_filter or active_sort != 'recommended' %}
+                    <a href="{{ url_for('experience.catalogue', category=active_category) }}" class="btn btn-ghost btn-icon" title="Clear filters" style="width:42px;height:42px;"><i class="bi bi-x-lg"></i></a>
+                    {% endif %}
+                </div>
+                <div class="col-12">
+                    <div class="form-check form-switch mt-1">
+                        <input class="form-check-input" type="checkbox" role="switch" id="eco_only" name="eco_only" value="1" {% if eco_filter %}checked{% endif %} onchange="this.form.submit()">
+                        <label class="form-check-label small" for="eco_only">Low-impact only (eco score ≥ 90)</label>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-muted small"><strong class="text-forest">{{ experiences|length }}</strong> experience{{ 's' if experiences|length != 1 }} found{% if on_date %} with open sessions on {{ on_date|date_format }}{% endif %}</span>
+        </div>
+
+        {% if experiences %}
+        <div class="row g-4">
+            {% for exp in experiences %}
+            <div class="col-md-6 col-xl-4">{{ exp_card(exp, show_supplier=true) }}</div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-lux">{{ empty_state('bi-compass', 'No experiences match your filters', 'Try a different keyword, raise the price limit or choose another date.', url_for('experience.catalogue'), 'Reset filters') }}</div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

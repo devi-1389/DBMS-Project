@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, status_pill %}
+{% block title %}Secure Checkout | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Step 2 of 2 · Simulated payment', 'Secure checkout', 'This is a payment simulator for the academic project - no real money is charged.',
+               [('My Bookings', url_for('guest.my_bookings')), ('Payment', None)]) }}
+<section class="section-sm">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <form method="POST" action="{{ url_for('payment.process_payment') }}" class="card-lux card-pad">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="booking_id" value="{{ booking.booking_id }}">
+                    <h4 class="mb-3">Payment method</h4>
+                    <div class="row g-2 mb-4">
+                        {% for value, label, icon in [('credit_card_sim', 'Card', 'bi-credit-card'), ('upi_sim', 'UPI', 'bi-phone'), ('net_banking_sim', 'Net banking', 'bi-bank'), ('resort_credit', 'Resort folio', 'bi-building')] %}
+                        <div class="col-6 col-md-3">
+                            <input type="radio" class="btn-check" name="payment_method" id="pm_{{ value }}" value="{{ value }}" {% if loop.first %}checked{% endif %}>
+                            <label class="btn btn-ghost w-100 py-3" for="pm_{{ value }}" style="border-radius: 12px;"><i class="bi {{ icon }} d-block fs-4 mb-1"></i>{{ label }}</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8"><label class="form-label">Name on account</label><input class="form-control" value="{{ current_user.name }}" disabled></div>
+                        <div class="col-md-4"><label class="form-label">Amount</label><input class="form-control" value="{{ booking.total_amount|inr }}" disabled></div>
+                    </div>
+                    <div class="small-caps text-gold mb-2">Simulate gateway response</div>
+                    <div class="d-grid d-md-flex gap-2">
+                        <button type="submit" name="sim_action" value="success" class="btn btn-gold btn-lg flex-grow-1"><i class="bi bi-check2-circle me-1"></i>Pay {{ booking.total_amount|inr }} (approve)</button>
+                        <button type="submit" name="sim_action" value="fail" class="btn btn-danger-soft btn-lg"><i class="bi bi-x-circle me-1"></i>Simulate decline</button>
+                    </div>
+                    <p class="form-hint mt-3 mb-0"><i class="bi bi-lock me-1"></i>Approval inserts a <code>payments</code> row, confirms the booking and allocates capacity, equipment and staff inside one database transaction.</p>
+                </form>
+                {% if attempts %}
+                <div class="card-lux mt-4">
+                    <div class="card-head"><h5>Previous attempts</h5></div>
+                    <div class="table-responsive"><table class="table table-lux">
+                        <thead><tr><th>Transaction</th><th>Method</th><th>Status</th><th>Time</th></tr></thead>
+                        <tbody>{% for a in attempts %}<tr><td class="font-mono small">{{ a.transaction_reference }}</td><td>{{ a.payment_method|replace('_sim', '')|replace('_', ' ') }}</td><td>{{ status_pill(a.payment_status) }}</td><td class="small">{{ a.paid_at|date_format('%d %b, %I:%M %p') }}</td></tr>{% endfor %}</tbody>
+                    </table></div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-lg-5">
+                <div class="card-lux card-pad">
+                    <div class="d-flex justify-content-between align-items-start mb-2"><span class="small-caps text-muted">Reservation</span>{{ status_pill(booking.booking_status) }}</div>
+                    <h4>{{ booking.experience_name }}</h4>
+                    <dl class="kv mt-3">
+                        <dt>Reference</dt><dd class="font-mono">{{ booking.booking_reference }}</dd>
+                        <dt>Session</dt><dd>{{ booking.slot_date|date_format('%a %d %b %Y') }}, {{ booking.start_time|time_format }}</dd>
+                        <dt>Guests</dt><dd>{{ booking.party_size }}</dd>
+                        <dt>Unit price</dt><dd>{{ booking.unit_price|inr }} / {{ 'guest' if booking.pricing_type == 'per_person' else 'booking' }}</dd>
+                        <dt>Free cancellation</dt><dd>until {{ booking.cancellation_deadline|date_format('%d %b, %I:%M %p') }}</dd>
+                    </dl>
+                    <div class="divider"></div>
+                    <div class="d-flex justify-content-between align-items-end"><span class="small-caps text-muted">Total due</span><span class="price">{{ booking.total_amount|inr }}</span></div>
+                    <div class="divider"></div>
+                    <form method="POST" action="{{ url_for('booking.cancel_booking', booking_id=booking.booking_id) }}" data-confirm="Abandon this unpaid reservation?">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="cancellation_reason" value="Guest abandoned checkout">
+                        <button class="btn btn-ghost btn-sm w-100">Abandon reservation</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

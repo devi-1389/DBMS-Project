@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .state-box { fill: #ffffff; stroke: #112d21; stroke-width: 2px; rx: 18px; filter: drop-shadow(0 4px 6px rgba(17,45,33,0.08)); }
+      .state-name { fill: #112d21; font-weight: bold; font-size: 13px; text-anchor: middle; font-family: monospace; letter-spacing: 0.5px; }
+      .trans-line { stroke: #2d6a4f; stroke-width: 2px; fill: none; }
+      .alt-trans { stroke: #c9184a; stroke-width: 1.8px; stroke-dasharray: 4,4; fill: none; }
+      .trans-text { font-size: 10px; font-weight: 600; fill: #1b2820; }
+      .alt-text { font-size: 10px; font-weight: bold; fill: #a4161a; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: bold; fill: #112d21; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d6a4f"/>
+    </marker>
+    <marker id="alt-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c9184a"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="35" class="title-text">SOLACE | Booking Lifecycle State-Transition Model</text>
+  <text x="40" y="55" font-size="11" fill="#5e6d64">Finite State Machine (FSM) detailing valid booking status mutations and release triggers</text>
+
+  <!-- Initial State -->
+  <circle cx="80" cy="220" r="14" fill="#112d21"/>
+
+  <!-- Transition 1: Initial -> PENDING -->
+  <path d="M 94 220 L 200 220" class="trans-line" marker-end="url(#arrow)"/>
+  <text x="98" y="210" class="trans-text">Initiate Booking [Capacity &amp; Gear Valid]</text>
+
+  <!-- STATE: PENDING -->
+  <g transform="translate(200, 190)">
+    <rect width="160" height="60" class="state-box" stroke="#c5a059"/>
+    <text x="80" y="35" class="state-name" fill="#c5a059">PENDING</text>
+  </g>
+
+  <!-- Transition 2: PENDING -> CONFIRMED (Success) -->
+  <path d="M 360 220 L 520 220" class="trans-line" marker-end="url(#arrow)"/>
+  <text x="375" y="210" class="trans-text">Payment Approved [Allocations Locked]</text>
+
+  <!-- STATE: CONFIRMED -->
+  <g transform="translate(520, 190)">
+    <rect width="170" height="60" class="state-box" stroke="#2d6a4f"/>
+    <text x="85" y="35" class="state-name" fill="#2d6a4f">CONFIRMED</text>
+  </g>
+
+  <!-- Transition 3: PENDING -> FAILED (Payment decline) -->
+  <path d="M 280 250 L 280 430" class="alt-trans" marker-end="url(#alt-arrow)"/>
+  <text x="145" y="340" class="alt-text">Payment Declined / Abandoned</text>
+
+  <!-- STATE: FAILED -->
+  <g transform="translate(200, 430)">
+    <rect width="160" height="60" class="state-box" stroke="#c9184a"/>
+    <text x="80" y="35" class="state-name" fill="#c9184a">FAILED</text>
+  </g>
+
+  <!-- Transition 4: FAILED -> PENDING (Retry) -->
+  <path d="M 340 430 L 340 250" class="trans-line" marker-end="url(#arrow)"/>
+  <text x="345" y="340" class="trans-text">Retry with Alternative Method</text>
+
+  <!-- Transition 5: CONFIRMED -> COMPLETED -->
+  <path d="M 690 220 L 820 220" class="trans-line" marker-end="url(#arrow)"/>
+  <text x="700" y="210" class="trans-text">Staff Marks Completed</text>
+
+  <!-- STATE: COMPLETED -->
+  <g transform="translate(820, 190)">
+    <rect width="150" height="60" class="state-box" stroke="#112d21"/>
+    <text x="75" y="35" class="state-name" fill="#112d21">COMPLETED</text>
+  </g>
+
+  <!-- Transition 6: COMPLETED -> Terminal (Review submitted) -->
+  <path d="M 895 250 L 895 340" class="trans-line" marker-end="url(#arrow)"/>
+  <text x="840" y="300" class="trans-text">Review Submitted</text>
+
+  <!-- Terminal Node 1 -->
+  <circle cx="895" cy="360" r="14" fill="#ffffff" stroke="#112d21" stroke-width="2"/>
+  <circle cx="895" cy="360" r="9" fill="#112d21"/>
+
+  <!-- Transition 7: CONFIRMED -> CANCELLED -->
+  <path d="M 605 250 L 605 430" class="alt-trans" marker-end="url(#alt-arrow)"/>
+  <text x="615" y="335" class="alt-text">Cancel [NOW &lt;= Deadline]</text>
+  <text x="615" y="350" font-size="9" fill="#5e6d64">Release Capacity &amp; Gear; Full Refund</text>
+
+  <!-- STATE: CANCELLED -->
+  <g transform="translate(520, 430)">
+    <rect width="170" height="60" class="state-box" stroke="#c9184a"/>
+    <text x="85" y="35" class="state-name" fill="#c9184a">CANCELLED</text>
+  </g>
+
+  <!-- Transition 8: CANCELLED -> Terminal -->
+  <path d="M 605 490 L 605 560" class="trans-line" marker-end="url(#arrow)"/>
+  <text x="615" y="525" class="trans-text">Financial Settlement Archived</text>
+
+  <!-- Terminal Node 2 -->
+  <circle cx="605" cy="580" r="14" fill="#ffffff" stroke="#112d21" stroke-width="2"/>
+  <circle cx="605" cy="580" r="9" fill="#112d21"/>
+</svg>

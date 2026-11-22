@@ -1,0 +1,93 @@
+{% extends 'admin/_layout.html' %}
+{% block title %}{{ 'New' if is_new else 'Edit' }} Experience | SOLACE Admin{% endblock %}
+{% block admin_content %}
+{% set e = experience or {} %}
+<div class="admin-title">
+    <div><span class="eyebrow">Catalogue · {{ 'create' if is_new else 'update' }}</span><h1>{{ 'New experience' if is_new else e.get('name') }}</h1></div>
+    <a href="{{ url_for('admin.experiences') }}" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left me-1"></i>All experiences</a>
+</div>
+<form method="POST" enctype="multipart/form-data" action="{{ url_for('admin.experience_new') if is_new else url_for('admin.experience_edit', experience_id=e.get('experience_id')) }}">
+    {{ csrf_field() }}
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <div class="card-lux card-pad mb-4">
+                <h4 class="mb-3">Basics</h4>
+                <div class="row g-3">
+                    <div class="col-md-7"><label class="form-label" for="name">Name</label><input class="form-control" id="name" name="name" maxlength="150" required value="{{ e.get('name') or '' }}"></div>
+                    <div class="col-md-5"><label class="form-label" for="slug">URL slug</label><input class="form-control font-mono" id="slug" name="slug" maxlength="150" pattern="[a-z0-9]+(-[a-z0-9]+)*" value="{{ e.get('slug') or '' }}" placeholder="auto from name"></div>
+                    <div class="col-md-6"><label class="form-label" for="category_id">Category</label>
+                        <select class="form-select" id="category_id" name="category_id" required>{% for c in categories %}<option value="{{ c.category_id }}" {% if e.get('category_id')|string == c.category_id|string %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+                    <div class="col-md-6"><label class="form-label" for="supplier_id">Supplier / partner</label>
+                        <select class="form-select" id="supplier_id" name="supplier_id"><option value="">In-house (none)</option>{% for s in suppliers %}<option value="{{ s.supplier_id }}" {% if e.get('supplier_id')|string == s.supplier_id|string %}selected{% endif %}>{{ s.name }}{{ ' (local)' if s.is_local }}</option>{% endfor %}</select></div>
+                    <div class="col-12"><label class="form-label" for="short_desc">Short description</label><input class="form-control" id="short_desc" name="short_desc" maxlength="255" required value="{{ e.get('short_desc') or '' }}"></div>
+                    <div class="col-12"><label class="form-label" for="full_desc">Full description</label><textarea class="form-control" id="full_desc" name="full_desc" rows="5" maxlength="5000" required>{{ e.get('full_desc') or '' }}</textarea></div>
+                </div>
+            </div>
+            <div class="card-lux card-pad mb-4">
+                <h4 class="mb-3">Pricing & capacity</h4>
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="form-label" for="pricing_type">Pricing model</label>
+                        <select class="form-select" id="pricing_type" name="pricing_type">
+                            <option value="per_person" {% if e.get('pricing_type') != 'per_booking' %}selected{% endif %}>Per guest</option>
+                            <option value="per_booking" {% if e.get('pricing_type') == 'per_booking' %}selected{% endif %}>Per private booking</option>
+                        </select></div>
+                    <div class="col-md-4"><label class="form-label" for="base_price">Base price (₹)</label><input type="number" step="0.01" min="0" class="form-control" id="base_price" name="base_price" required value="{{ e.get('base_price') or '' }}"></div>
+                    <div class="col-md-4"><label class="form-label" for="duration_minutes">Duration (minutes)</label><input type="number" min="1" max="1440" class="form-control" id="duration_minutes" name="duration_minutes" required value="{{ e.get('duration_minutes') or 90 }}"></div>
+                    <div class="col-md-4"><label class="form-label" for="min_party_size">Min party</label><input type="number" min="1" max="25" class="form-control" id="min_party_size" name="min_party_size" value="{{ e.get('min_party_size') or 1 }}"></div>
+                    <div class="col-md-4"><label class="form-label" for="max_party_size">Max party</label><input type="number" min="1" max="25" class="form-control" id="max_party_size" name="max_party_size" value="{{ e.get('max_party_size') or 10 }}"></div>
+                    <div class="col-md-4"><label class="form-label" for="capacity_per_slot">Capacity per slot</label><input type="number" min="1" max="500" class="form-control" id="capacity_per_slot" name="capacity_per_slot" required value="{{ e.get('capacity_per_slot') or 10 }}">
+                        <div class="form-hint">Guests for per-guest pricing; private bookings for per-booking pricing.</div></div>
+                </div>
+            </div>
+            <div class="card-lux card-pad">
+                <h4 class="mb-3">Guest information</h4>
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label" for="age_restrictions">Age guidance</label><input class="form-control" id="age_restrictions" name="age_restrictions" maxlength="100" value="{{ e.get('age_restrictions') or '' }}"></div>
+                    <div class="col-md-6"><label class="form-label" for="accessibility_info">Accessibility</label><input class="form-control" id="accessibility_info" name="accessibility_info" maxlength="2000" value="{{ e.get('accessibility_info') or '' }}"></div>
+                    <div class="col-12"><label class="form-label" for="safety_instructions">Safety instructions</label><textarea class="form-control" id="safety_instructions" name="safety_instructions" rows="2" maxlength="2000">{{ e.get('safety_instructions') or '' }}</textarea></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="card-lux card-pad mb-4">
+                <h4 class="mb-3">Image</h4>
+                <div class="rounded-3 overflow-hidden mb-3" style="aspect-ratio: 3/2; background: var(--sand-100);">
+                    <img id="imgPreview" src="{{ e.get('image_url') or fallback_image() }}" alt="Preview" class="w-100 h-100 object-fit-cover" onerror="this.onerror=null;this.src='{{ fallback_image() }}';">
+                </div>
+                {% if uploads_enabled %}
+                <label class="form-label" for="image_file">Upload a photo (JPG, PNG, WEBP · max 5 MB)</label>
+                <input type="file" class="form-control mb-3" id="image_file" name="image_file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+                <label class="form-label" for="image_url">…or image URL</label>
+                {% else %}
+                <div class="form-hint mb-3"><i class="bi bi-info-circle me-1"></i>Photo upload is switched off on this hosting because uploaded files cannot be stored on the server. Use an image URL.</div>
+                <label class="form-label" for="image_url">Image URL</label>
+                {% endif %}
+                <input class="form-control font-mono small" id="image_url" name="image_url" maxlength="255" value="{{ e.get('image_url') or '' }}" placeholder="/static/images/experiences/… or https://…">
+                <div class="form-hint">If an image cannot load, the category illustration is shown automatically.</div>
+            </div>
+            <div class="card-lux card-pad mb-4">
+                <h4 class="mb-3">Sustainability & status</h4>
+                <label class="form-label" for="eco_impact_score">Eco-impact score (1–100)</label>
+                <input type="number" min="1" max="100" class="form-control mb-3" id="eco_impact_score" name="eco_impact_score" value="{{ e.get('eco_impact_score') or 85 }}">
+                <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" role="switch" id="is_low_impact" name="is_low_impact" value="1" {% if e.get('is_low_impact', 1)|string in ('1', 'True') %}checked{% endif %}><label class="form-check-label" for="is_low_impact">Low-impact activity</label></div>
+                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="is_active" name="is_active" value="1" {% if e.get('is_active', 1)|string in ('1', 'True') %}checked{% endif %}><label class="form-check-label" for="is_active">Visible & bookable</label></div>
+            </div>
+            <button class="btn btn-gold w-100 btn-lg">{{ 'Create experience' if is_new else 'Save changes' }}</button>
+        </div>
+    </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+const imageFile = document.getElementById('image_file');
+if (imageFile) imageFile.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) document.getElementById('imgPreview').src = URL.createObjectURL(file);
+});
+document.getElementById('name').addEventListener('input', (e) => {
+    const slug = document.getElementById('slug');
+    if (!slug.dataset.touched) slug.placeholder = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'auto from name';
+});
+document.getElementById('slug').addEventListener('input', (e) => { e.target.dataset.touched = '1'; });
+</script>
+{% endblock %}

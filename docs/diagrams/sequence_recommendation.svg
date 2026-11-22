@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 600" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .lifeline { stroke: #95a792; stroke-width: 1.5px; stroke-dasharray: 4,4; }
+      .obj-box { fill: #112d21; stroke: #c5a059; stroke-width: 1.5px; rx: 6px; }
+      .obj-txt { fill: #fcfbf7; font-weight: bold; font-size: 13px; text-anchor: middle; }
+      .msg-line { stroke: #2d6a4f; stroke-width: 2px; }
+      .ret-line { stroke: #c5a059; stroke-width: 2px; stroke-dasharray: 4,4; }
+      .msg-txt { font-size: 11px; font-weight: 600; fill: #1b2820; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: bold; fill: #112d21; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d6a4f"/>
+    </marker>
+    <marker id="ret-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c5a059"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="40" class="title-text">Sequence 1: Guest Searching &amp; Personalized Recommendation Flow</text>
+
+  <!-- Lifeline Headers -->
+  <g transform="translate(60, 70)">
+    <rect width="120" height="40" class="obj-box"/>
+    <text x="60" y="25" class="obj-txt">Guest (Browser)</text>
+    <line x1="60" y1="40" x2="60" y2="500" class="lifeline"/>
+  </g>
+
+  <g transform="translate(290, 70)">
+    <rect width="140" height="40" class="obj-box"/>
+    <text x="70" y="25" class="obj-txt">GuestController</text>
+    <line x1="70" y1="40" x2="70" y2="500" class="lifeline"/>
+  </g>
+
+  <g transform="translate(540, 70)">
+    <rect width="160" height="40" class="obj-box"/>
+    <text x="80" y="25" class="obj-txt">MatchingEngine</text>
+    <line x1="80" y1="40" x2="80" y2="500" class="lifeline"/>
+  </g>
+
+  <g transform="translate(780, 70)">
+    <rect width="130" height="40" class="obj-box"/>
+    <text x="65" y="25" class="obj-txt">MySQL Database</text>
+    <line x1="65" y1="40" x2="65" y2="500" class="lifeline"/>
+  </g>
+
+  <!-- Messages -->
+  <!-- 1. GET /guest/recommendations -->
+  <line x1="120" y1="140" x2="360" y2="140" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="135" y="132" class="msg-txt">1. GET /guest/recommendations</text>
+
+  <!-- 2. get_personalized_recommendations(guest_id) -->
+  <line x1="360" y1="180" x2="620" y2="180" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="375" y="172" class="msg-txt">2. get_personalized_recommendations(guest_id)</text>
+
+  <!-- 3. SELECT preferences & budget -->
+  <line x1="620" y1="220" x2="845" y2="220" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="635" y="212" class="msg-txt">3. Query guests, guest_preferences, bookings</text>
+
+  <!-- 4. Return guest profile and preferences -->
+  <line x1="845" y1="260" x2="620" y2="260" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="645" y="252" class="msg-txt">4. Return budget ceiling, dates, interest weights</text>
+
+  <!-- 5. Query candidate active experiences & slots -->
+  <line x1="620" y1="300" x2="845" y2="300" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="635" y="292" class="msg-txt">5. Query active experiences with capacity &gt;= party_size</text>
+
+  <!-- 6. Return eligible dataset -->
+  <line x1="845" y1="340" x2="620" y2="340" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="645" y="332" class="msg-txt">6. Return experiences, slot inventory, ratings</text>
+
+  <!-- 7. Compute 5-factor scores & sort -->
+  <path d="M 620 370 C 660 370, 660 400, 620 400" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="665" y="390" class="msg-txt">7. Apply 5-Factor Weighted Model &amp; Explanations</text>
+
+  <!-- 8. Return ranked recommendations -->
+  <line x1="620" y1="430" x2="360" y2="430" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="375" y="422" class="msg-txt">8. Return ranked list + breakdown badges</text>
+
+  <!-- 9. Render recommendations.html -->
+  <line x1="360" y1="470" x2="120" y2="470" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="135" y="462" class="msg-txt">9. Render recommendations.html with Book Now CTA</text>
+</svg>

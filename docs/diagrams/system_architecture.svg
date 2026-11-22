@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 750" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .tier-box { fill: #ffffff; stroke: #112d21; stroke-width: 1.5px; rx: 12px; filter: drop-shadow(0 4px 8px rgba(17,45,33,0.06)); }
+      .tier-head { fill: #112d21; font-weight: bold; font-size: 14px; }
+      .comp-box { fill: #f4f1ea; stroke: #c5a059; stroke-width: 1.5px; rx: 6px; }
+      .comp-title { fill: #112d21; font-weight: bold; font-size: 11px; text-anchor: middle; }
+      .comp-desc { fill: #5e6d64; font-size: 9.5px; text-anchor: middle; }
+      .tier-arrow { stroke: #2d6a4f; stroke-width: 2.5px; fill: none; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 24px; font-weight: bold; fill: #112d21; }
+    </style>
+    <marker id="big-arr" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d6a4f"/>
+    </marker>
+  </defs>
+
+  <text x="50" y="40" class="title-text">SOLACE | 3-Tier Enterprise System Architecture</text>
+  <text x="50" y="62" font-size="12" fill="#5e6d64">Integrated Presentation, Flask Application Business Logic, and MySQL Relational Data Layer</text>
+
+  <!-- TIER 1: PRESENTATION TIER -->
+  <g transform="translate(50, 90)">
+    <rect width="1000" height="150" class="tier-box"/>
+    <text x="25" y="30" class="tier-head">1. PRESENTATION TIER (Client Interface)</text>
+    
+    <g transform="translate(30, 50)">
+      <rect width="210" height="75" class="comp-box"/>
+      <text x="105" y="28" class="comp-title">Bootstrap 5 &amp; HTML5</text>
+      <text x="105" y="46" class="comp-desc">Responsive layouts, modals,</text>
+      <text x="105" y="60" class="comp-desc">toasts &amp; accessible forms</text>
+    </g>
+
+    <g transform="translate(270, 50)">
+      <rect width="210" height="75" class="comp-box"/>
+      <text x="105" y="28" class="comp-title">Custom Luxury Design</text>
+      <text x="105" y="46" class="comp-desc">Deep forest green, sage,</text>
+      <text x="105" y="60" class="comp-desc">warm ivory &amp; champagne gold</text>
+    </g>
+
+    <g transform="translate(510, 50)">
+      <rect width="210" height="75" class="comp-box"/>
+      <text x="105" y="28" class="comp-title">Chart.js Analytics</text>
+      <text x="105" y="46" class="comp-desc">Category revenue bars,</text>
+      <text x="105" y="60" class="comp-desc">booking distribution donuts</text>
+    </g>
+
+    <g transform="translate(750, 50)">
+      <rect width="220" height="75" class="comp-box"/>
+      <text x="110" y="28" class="comp-title">Vanilla JS UI Handlers</text>
+      <text x="110" y="46" class="comp-desc">Live price calculation, tooltips,</text>
+      <text x="110" y="60" class="comp-desc">and 1-click demo fillers</text>
+    </g>
+  </g>
+
+  <!-- Tier 1 -> Tier 2 Arrow -->
+  <path d="M 550 240 L 550 290" class="tier-arrow" marker-end="url(#big-arr)"/>
+  <text x="560" y="270" font-size="10" font-weight="bold" fill="#2d6a4f">HTTP / REST / Jinja SSR</text>
+
+  <!-- TIER 2: APPLICATION TIER -->
+  <g transform="translate(50, 290)">
+    <rect width="1000" height="190" class="tier-box"/>
+    <text x="25" y="30" class="tier-head">2. APPLICATION TIER (Python Flask &amp; Core Services)</text>
+    
+    <g transform="translate(30, 50)">
+      <rect width="220" height="115" class="comp-box"/>
+      <text x="110" y="24" class="comp-title">Modular Blueprints</text>
+      <text x="110" y="42" class="comp-desc">auth_routes (RBAC)</text>
+      <text x="110" y="58" class="comp-desc">guest_routes (profile/itin)</text>
+      <text x="110" y="74" class="comp-desc">booking &amp; payment_routes</text>
+      <text x="110" y="90" class="comp-desc">admin &amp; staff_routes</text>
+    </g>
+
+    <g transform="translate(270, 50)">
+      <rect width="220" height="115" class="comp-box"/>
+      <text x="110" y="24" class="comp-title">Recommendation Engine</text>
+      <text x="110" y="42" class="comp-desc">40% Interest Affinity</text>
+      <text x="110" y="58" class="comp-desc">25% Budget Suitability</text>
+      <text x="110" y="74" class="comp-desc">15% Schedule Fit</text>
+      <text x="110" y="90" class="comp-desc">10% Eco + 10% Rating</text>
+    </g>
+
+    <g transform="translate(510, 50)">
+      <rect width="220" height="115" class="comp-box"/>
+      <text x="110" y="24" class="comp-title">Availability Engine</text>
+      <text x="110" y="42" class="comp-desc">Concurrency-safe locking</text>
+      <text x="110" y="58" class="comp-desc">Equipment quantity checks</text>
+      <text x="110" y="74" class="comp-desc">Staff conflict resolution</text>
+      <text x="110" y="90" class="comp-desc">Atomic resource reservation</text>
+    </g>
+
+    <g transform="translate(750, 50)">
+      <rect width="220" height="115" class="comp-box"/>
+      <text x="110" y="24" class="comp-title">Itinerary &amp; Audit Engine</text>
+      <text x="110" y="42" class="comp-desc">Multi-day buffer validation</text>
+      <text x="110" y="58" class="comp-desc">Expenditure running totals</text>
+      <text x="110" y="74" class="comp-desc">Administrative audit logs</text>
+      <text x="110" y="90" class="comp-desc">JSON change state diffs</text>
+    </g>
+  </g>
+
+  <!-- Tier 2 -> Tier 3 Arrow -->
+  <path d="M 550 480 L 550 530" class="tier-arrow" marker-end="url(#big-arr)"/>
+  <text x="560" y="510" font-size="10" font-weight="bold" fill="#2d6a4f">PyMySQL / DictCursor Connection Pool</text>
+
+  <!-- TIER 3: DATA TIER -->
+  <g transform="translate(50, 530)">
+    <rect width="1000" height="180" class="tier-box"/>
+    <text x="25" y="30" class="tier-head">3. DATA TIER (MySQL / MariaDB Relational Database - 3NF)</text>
+    
+    <g transform="translate(30, 50)">
+      <rect width="220" height="105" class="comp-box"/>
+      <text x="110" y="25" class="comp-title">23 Normalized Tables</text>
+      <text x="110" y="45" class="comp-desc">users, guests, preferences,</text>
+      <text x="110" y="60" class="comp-desc">experiences, slots, bookings,</text>
+      <text x="110" y="75" class="comp-desc">resources, staff, payments,</text>
+      <text x="110" y="90" class="comp-desc">reviews, itineraries &amp; audits</text>
+    </g>
+
+    <g transform="translate(270, 50)">
+      <rect width="220" height="105" class="comp-box"/>
+      <text x="110" y="25" class="comp-title">Relational Integrity</text>
+      <text x="110" y="45" class="comp-desc">Foreign Keys with CASCADE</text>
+      <text x="110" y="60" class="comp-desc">and RESTRICT delete rules,</text>
+      <text x="110" y="75" class="comp-desc">CHECK constraints on ratings,</text>
+      <text x="110" y="90" class="comp-desc">budget &gt;= 0, weights 1 to 5</text>
+    </g>
+
+    <g transform="translate(510, 50)">
+      <rect width="220" height="105" class="comp-box"/>
+      <text x="110" y="25" class="comp-title">Views &amp; Triggers</text>
+      <text x="110" y="45" class="comp-desc">v_experience_details</text>
+      <text x="110" y="60" class="comp-desc">v_slot_availability</text>
+      <text x="110" y="75" class="comp-desc">v_sustainability_metrics</text>
+      <text x="110" y="90" class="comp-desc">trg_booking_status_audit</text>
+    </g>
+
+    <g transform="translate(750, 50)">
+      <rect width="220" height="105" class="comp-box"/>
+      <text x="110" y="25" class="comp-title">ACID Concurrency Engine</text>
+      <text x="110" y="45" class="comp-desc">START TRANSACTION</text>
+      <text x="110" y="60" class="comp-desc">SELECT ... FOR UPDATE</text>
+      <text x="110" y="75" class="comp-desc">Atomic allocations</text>
+      <text x="110" y="90" class="comp-desc">COMMIT &amp; ROLLBACK safety</text>
+    </g>
+  </g>
+</svg>

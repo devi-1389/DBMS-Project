@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, stat %}
+{% block title %}Staff Profile | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Staff profile', staff.full_name, staff.specialization, [('Duty roster', url_for('staff.dashboard')), ('Profile', None)]) }}
+<section class="section-sm">
+    <div class="container" style="max-width: 980px;">
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">{{ stat('bi-briefcase', 'Total assignments', workload.total_assignments or 0, 'From view v_staff_workload', 'gold') }}</div>
+            <div class="col-md-4">{{ stat('bi-hourglass-split', 'Active', workload.active_assignments or 0) }}</div>
+            <div class="col-md-4">{{ stat('bi-check2-all', 'Completed', workload.completed_assignments or 0, None, 'sea') }}</div>
+        </div>
+        <form method="POST" class="card-lux card-pad">
+            {{ csrf_field() }}
+            <div class="row g-3">
+                <div class="col-md-6"><label class="form-label">Name</label><input class="form-control" value="{{ staff.full_name }}" disabled><div class="form-hint">Name and specialisation are managed by the administrator.</div></div>
+                <div class="col-md-6"><label class="form-label">Email</label><input class="form-control" value="{{ staff.email }}" disabled></div>
+                <div class="col-md-6"><label class="form-label" for="contact_phone">Contact phone</label><input class="form-control" id="contact_phone" name="contact_phone" value="{{ staff.contact_phone or '' }}" maxlength="30"></div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="is_available" name="is_available" value="1" {% if staff.is_available %}checked{% endif %}>
+                        <label class="form-check-label" for="is_available">Available for new session assignments</label>
+                    </div>
+                </div>
+                <div class="col-12"><label class="form-label" for="bio">Bio</label><textarea class="form-control" id="bio" name="bio" rows="4" maxlength="1000">{{ staff.bio or '' }}</textarea></div>
+            </div>
+            <div class="text-end mt-4"><button class="btn btn-gold">Save profile</button></div>
+        </form>
+    </div>
+</section>
+{% endblock %}

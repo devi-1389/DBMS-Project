@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .boundary-box { fill: #ffffff; stroke: #112d21; stroke-width: 2px; stroke-dasharray: 6,4; rx: 12px; }
+      .usecase-oval { fill: #fcfbf7; stroke: #2d6a4f; stroke-width: 1.8px; rx: 80px; ry: 24px; filter: drop-shadow(0 2px 4px rgba(17,45,33,0.06)); }
+      .usecase-oval:hover { fill: #d8e2dc; }
+      .usecase-text { fill: #112d21; font-size: 11px; font-weight: 600; text-anchor: middle; }
+      .actor-head { fill: #112d21; }
+      .actor-line { stroke: #112d21; stroke-width: 2.5px; stroke-linecap: round; }
+      .actor-name { fill: #112d21; font-weight: bold; font-size: 13px; text-anchor: middle; }
+      .assoc-line { stroke: #c5a059; stroke-width: 1.5px; fill: none; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 24px; font-weight: bold; fill: #112d21; }
+    </style>
+  </defs>
+
+  <text x="50" y="45" class="title-text">SOLACE | Unified Use-Case Model</text>
+  <text x="50" y="68" font-size="12" fill="#5e6d64">Actor interactions, functional system boundaries, and role privileges</text>
+
+  <!-- System Boundary -->
+  <rect x="250" y="90" width="700" height="780" class="boundary-box"/>
+  <text x="600" y="120" font-family="'Cormorant Garamond', serif" font-size="18" font-weight="bold" fill="#112d21" text-anchor="middle">
+    SYSTEM BOUNDARY: SOLACE EXPERIENCE PLATFORM
+  </text>
+
+  <!-- ACTOR 1: GUEST -->
+  <g transform="translate(100, 260)">
+    <circle cx="40" cy="30" r="15" class="actor-head"/>
+    <line x1="40" y1="45" x2="40" y2="85" class="actor-line"/>
+    <line x1="15" y1="60" x2="65" y2="60" class="actor-line"/>
+    <line x1="40" y1="85" x2="20" y2="125" class="actor-line"/>
+    <line x1="40" y1="85" x2="60" y2="125" class="actor-line"/>
+    <text x="40" y="145" class="actor-name">GUEST</text>
+  </g>
+
+  <!-- ACTOR 2: ADMINISTRATOR -->
+  <g transform="translate(1040, 220)">
+    <circle cx="40" cy="30" r="15" class="actor-head"/>
+    <line x1="40" y1="45" x2="40" y2="85" class="actor-line"/>
+    <line x1="15" y1="60" x2="65" y2="60" class="actor-line"/>
+    <line x1="40" y1="85" x2="20" y2="125" class="actor-line"/>
+    <line x1="40" y1="85" x2="60" y2="125" class="actor-line"/>
+    <text x="40" y="145" class="actor-name">ADMINISTRATOR</text>
+  </g>
+
+  <!-- ACTOR 3: STAFF & GUIDES -->
+  <g transform="translate(1040, 560)">
+    <circle cx="40" cy="30" r="15" class="actor-head"/>
+    <line x1="40" y1="45" x2="40" y2="85" class="actor-line"/>
+    <line x1="15" y1="60" x2="65" y2="60" class="actor-line"/>
+    <line x1="40" y1="85" x2="20" y2="125" class="actor-line"/>
+    <line x1="40" y1="85" x2="60" y2="125" class="actor-line"/>
+    <text x="40" y="145" class="actor-name">STAFF / GUIDE</text>
+  </g>
+
+  <!-- ACTOR 4: PAYMENT SIMULATOR -->
+  <g transform="translate(600, 840)">
+    <rect x="-80" y="0" width="160" height="30" fill="#112d21" rx="4"/>
+    <text x="0" y="20" fill="#fff" font-size="11" font-weight="bold" text-anchor="middle">PAYMENT SIMULATOR</text>
+  </g>
+
+  <!-- Use Cases: Guest -->
+  <!-- UC1 -->
+  <g transform="translate(420, 160)">
+    <rect width="180" height="42" class="usecase-oval"/>
+    <text x="90" y="26" class="usecase-text">Register &amp; Authenticate</text>
+  </g>
+  <!-- UC2 -->
+  <g transform="translate(420, 220)">
+    <rect width="180" height="42" class="usecase-oval"/>
+    <text x="90" y="26" class="usecase-text">Calibrate Interest Weights</text>
+  </g>
+  <!-- UC3 -->
+  <g transform="translate(420, 280)">
+    <rect width="180" height="42" class="usecase-oval"/>
+    <text x="90" y="26" class="usecase-text">Receive AI Recommendations</text>
+  </g>
+  <!-- UC4 -->
+  <g transform="translate(420, 340)">
+    <rect width="180" height="42" class="usecase-oval"/>
+    <text x="90" y="26" class="usecase-text">Plan Multi-Day Itinerary</text>
+  </g>
+  <!-- UC5 -->
+  <g transform="translate(420, 400)">
+    <rect width="180" height="42" class="usecase-oval"/>
+    <text x="90" y="26" class="usecase-text">Book Slot &amp; Lock Resources</text>
+  </g>
+  <!-- UC6 -->
+  <g transform="translate(420, 460)">
+    <rect width="180" height="42" class="usecase-oval"/>
+    <text x="90" y="26" class="usecase-text">Cancel &amp; Refund Booking</text>
+  </g>
+  <!-- UC7 -->
+  <g transform="translate(420, 520)">
+    <rect width="180" height="42" class="usecase-oval"/>
+    <text x="90" y="26" class="usecase-text">Submit Verified Review</text>
+  </g>
+
+  <!-- Use Cases: Admin -->
+  <!-- UC8 -->
+  <g transform="translate(680, 160)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">Manage Experience CRUD</text>
+  </g>
+  <!-- UC9 -->
+  <g transform="translate(680, 220)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">Generate &amp; Lock Slots</text>
+  </g>
+  <!-- UC10 -->
+  <g transform="translate(680, 280)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">Manage Resources &amp; Staff</text>
+  </g>
+  <!-- UC11 -->
+  <g transform="translate(680, 340)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">Override Booking Statuses</text>
+  </g>
+  <!-- UC12 -->
+  <g transform="translate(680, 400)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">View SQL Reports &amp; KPIs</text>
+  </g>
+  <!-- UC13 -->
+  <g transform="translate(680, 460)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">Review Security Audit Logs</text>
+  </g>
+
+  <!-- Use Cases: Staff -->
+  <!-- UC14 -->
+  <g transform="translate(560, 620)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">View Duty Roster &amp; Guests</text>
+  </g>
+  <!-- UC15 -->
+  <g transform="translate(560, 680)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">Mark Session Completed</text>
+  </g>
+  <!-- UC16 -->
+  <g transform="translate(560, 740)">
+    <rect width="200" height="42" class="usecase-oval"/>
+    <text x="100" y="26" class="usecase-text">Report Equipment Problem</text>
+  </g>
+
+  <!-- Association Lines: Guest -->
+  <line x1="160" y1="320" x2="420" y2="181" class="assoc-line"/>
+  <line x1="160" y1="320" x2="420" y2="241" class="assoc-line"/>
+  <line x1="160" y1="320" x2="420" y2="301" class="assoc-line"/>
+  <line x1="160" y1="320" x2="420" y2="361" class="assoc-line"/>
+  <line x1="160" y1="320" x2="420" y2="421" class="assoc-line"/>
+  <line x1="160" y1="320" x2="420" y2="481" class="assoc-line"/>
+  <line x1="160" y1="320" x2="420" y2="541" class="assoc-line"/>
+
+  <!-- Association Lines: Admin -->
+  <line x1="1040" y1="280" x2="880" y2="181" class="assoc-line"/>
+  <line x1="1040" y1="280" x2="880" y2="241" class="assoc-line"/>
+  <line x1="1040" y1="280" x2="880" y2="301" class="assoc-line"/>
+  <line x1="1040" y1="280" x2="880" y2="361" class="assoc-line"/>
+  <line x1="1040" y1="280" x2="880" y2="421" class="assoc-line"/>
+  <line x1="1040" y1="280" x2="880" y2="481" class="assoc-line"/>
+
+  <!-- Association Lines: Staff -->
+  <line x1="1040" y1="620" x2="760" y2="641" class="assoc-line"/>
+  <line x1="1040" y1="620" x2="760" y2="701" class="assoc-line"/>
+  <line x1="1040" y1="620" x2="760" y2="761" class="assoc-line"/>
+
+  <!-- Association Lines: Payment Simulator -->
+  <line x1="510" y1="442" x2="600" y2="840" class="assoc-line"/>
+</svg>

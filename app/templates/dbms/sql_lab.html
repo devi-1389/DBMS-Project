@@ -1,0 +1,118 @@
+{% extends 'dbms/_layout.html' %}
+{% block title %}SQL Query Laboratory | SOLACE Database Explorer{% endblock %}
+{% block dbms_title %}SQL Query Laboratory{% endblock %}
+{% block dbms_subtitle %}{{ catalogue|sum(attribute='queries', start=[])|length }} documented queries across 10 categories, executed against the live solace_db.{% endblock %}
+{% block dbms_content %}
+{% if can_execute %}
+<div class="card-lux mb-4" id="console">
+    <div class="card-head"><h5><i class="bi bi-terminal text-gold me-1"></i>Read-only SQL console</h5><span class="small text-muted">Administrators only · SELECT / WITH / SHOW / DESCRIBE / EXPLAIN · max {{ row_limit }} rows · runs in START TRANSACTION READ ONLY</span></div>
+    <div class="card-pad">
+        <form id="consoleForm" data-allow-resubmit>
+            <textarea id="consoleSql" class="form-control font-mono mb-2" rows="4" spellcheck="false" style="font-size: .85rem;" aria-label="SQL query">SELECT e.name, COUNT(b.booking_id) AS bookings
+FROM experiences e LEFT JOIN bookings b ON b.experience_id = e.experience_id
+GROUP BY e.experience_id ORDER BY bookings DESC LIMIT 10;</textarea>
+            <div class="d-flex gap-2"><button class="btn btn-gold btn-sm"><i class="bi bi-play-fill me-1"></i>Run query</button><span class="small text-muted align-self-center">Ctrl + Enter to run</span></div>
+        </form>
+        <div class="sql-result" id="consoleResult"></div>
+    </div>
+</div>
+{% else %}
+<div class="card-lux card-pad mb-4 d-flex flex-wrap gap-3 align-items-center justify-content-between" style="border-left: 4px solid var(--gold-500);">
+    <div class="small"><strong><i class="bi bi-lock me-1"></i>Read-only study mode.</strong> All statements, explanations and expected outputs are visible. Live execution against MySQL is restricted to administrators.</div>
+    {% if not current_user %}<a href="{{ url_for('auth.login', next=request.path) }}" class="btn btn-gold btn-sm">Sign in as administrator</a>{% endif %}
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-3">
+        <div class="lab-nav card-lux card-pad">
+            {% for cat in catalogue %}<a href="#cat-{{ cat.key }}">{{ loop.index }}. {{ cat.label }} <span class="small text-muted">{{ cat.queries|length }}</span></a>{% endfor %}
+            <div class="divider my-2"></div>
+            <div class="small text-muted">
+                <div class="mb-1"><span class="mode-badge mode-readonly">read-only</span> READ ONLY transaction</div>
+                <div class="mb-1"><span class="mode-badge mode-sandbox">sandbox</span> runs, then ROLLBACK</div>
+                <div class="mb-1"><span class="mode-badge mode-ddl">temp ddl</span> TEMPORARY tables only</div>
+                <div><span class="mode-badge mode-display">study</span> shown, not executed</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-9">
+        {% for cat in catalogue %}
+        <section id="cat-{{ cat.key }}" class="mb-4" style="scroll-margin-top: 90px;">
+            <div class="d-flex align-items-baseline gap-2 mb-2"><h3 class="mb-0">{{ loop.index }}. {{ cat.label }}</h3><span class="small text-muted">{{ cat.description }}</span></div>
+            {% for q in cat.queries %}
+            <div class="sql-card" id="q-{{ q.id }}">
+                <div class="sql-card__head">
+                    <div>
+                        <h5>{{ q.title }}</h5>
+                        <div class="d-flex flex-wrap gap-1">{% for t in q.tables %}<span class="tag tag-muted font-mono">{{ t }}</span>{% endfor %}</div>
+                    </div>
+                    <div class="text-end d-flex flex-column align-items-end gap-2">
+                        <span class="mode-badge mode-{{ q.mode }}">{{ {'readonly': 'read-only', 'sandbox': 'sandbox', 'ddl': 'temp ddl', 'display': 'study'}[q.mode] }}</span>
+                        {% if can_execute and q.mode != 'display' %}<button class="btn btn-forest btn-sm run-btn" data-id="{{ q.id }}"><i class="bi bi-play-fill me-1"></i>Run</button>{% endif %}
+                    </div>
+                </div>
+                <div class="sql-card__body">
+                    <pre class="code-block" data-sql>{{ q.sql }}</pre>
+                    <div class="row g-3 mt-1 small">
+                        <div class="col-md-8"><div class="small-caps text-gold mb-1">Explanation</div>{{ q.explanation }}</div>
+                        <div class="col-md-4"><div class="small-caps text-gold mb-1">Expected output</div>{{ q.expected }}</div>
+                    </div>
+                    <div class="sql-result" data-result-for="{{ q.id }}"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+{% if can_execute %}
+<script>
+(function () {
+    const token = document.querySelector('meta[name="csrf-token"]').content;
+    const esc = window.solaceEscape;
+
+    function renderResults(container, payload) {
+        if (!payload.ok) { container.innerHTML = `<div class="sql-error mt-2"><i class="bi bi-x-octagon me-1"></i>${esc(payload.error)}</div>`; return; }
+        let html = '';
+        if (payload.mode === 'sandbox') html += '<div class="small text-muted mt-2"><i class="bi bi-arrow-counterclockwise me-1"></i>Executed in a transaction that was rolled back - the real data is unchanged.</div>';
+        if (payload.mode === 'ddl') html += '<div class="small text-muted mt-2"><i class="bi bi-hourglass me-1"></i>Executed on session-only TEMPORARY tables, discarded when the connection closed.</div>';
+        payload.results.forEach((r) => {
+            if (r.label) html += `<div class="result-label">${esc(r.label)}</div>`;
+            if (r.error) { html += `<div class="sql-error ${r.expected_error ? 'sql-expected-error' : ''}"><i class="bi bi-exclamation-triangle me-1"></i>${esc(r.error)}${r.expected_error ? ' <em>(expected)</em>' : ''}</div>`; return; }
+            if (r.message) { html += `<div class="small font-mono text-forest">${esc(r.message)}${r.elapsed_ms !== undefined ? ` <span class="text-muted">(${r.elapsed_ms} ms)</span>` : ''}</div>`; return; }
+            if (!r.columns.length) { html += '<div class="small text-muted">Statement executed.</div>'; return; }
+            html += `<div class="table-wrap"><table class="table table-lux mb-0"><thead><tr>${r.columns.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>`;
+            html += r.rows.map((row) => `<tr>${row.map((v) => v === null ? '<td class="null">NULL</td>' : `<td title="${esc(v)}">${esc(v)}</td>`).join('')}</tr>`).join('');
+            html += `</tbody></table></div><div class="small text-muted mt-1">${r.rowcount} row(s)${r.truncated ? ' (truncated)' : ''} · ${r.elapsed_ms} ms</div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    async function post(url, body) {
+        const res = await fetch(url, { method: 'POST', headers: { 'X-CSRF-Token': token, 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        try { return await res.json(); } catch (e) { return { ok: false, error: `HTTP ${res.status}` }; }
+    }
+
+    document.querySelectorAll('.run-btn').forEach((btn) => btn.addEventListener('click', async () => {
+        const target = document.querySelector(`[data-result-for="${btn.dataset.id}"]`);
+        btn.disabled = true; target.innerHTML = '<div class="small text-muted mt-2"><span class="spinner-border spinner-border-sm me-1"></span>Executing…</div>';
+        renderResults(target, await post(`{{ url_for('dbms.sql_lab_page') }}/run/${btn.dataset.id}`, ''));
+        btn.disabled = false;
+    }));
+
+    const form = document.getElementById('consoleForm');
+    const sql = document.getElementById('consoleSql');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const out = document.getElementById('consoleResult');
+        out.innerHTML = '<div class="small text-muted mt-2"><span class="spinner-border spinner-border-sm me-1"></span>Executing…</div>';
+        renderResults(out, await post('{{ url_for('dbms.sql_console') }}', 'sql=' + encodeURIComponent(sql.value)));
+    });
+    sql.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) form.requestSubmit(); });
+})();
+</script>
+{% endif %}
+{% endblock %}

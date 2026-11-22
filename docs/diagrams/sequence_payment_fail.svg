@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 950 550" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .lifeline { stroke: #95a792; stroke-width: 1.5px; stroke-dasharray: 4,4; }
+      .obj-box { fill: #112d21; stroke: #c5a059; stroke-width: 1.5px; rx: 6px; }
+      .obj-txt { fill: #fcfbf7; font-weight: bold; font-size: 13px; text-anchor: middle; }
+      .msg-line { stroke: #2d6a4f; stroke-width: 2px; }
+      .err-line { stroke: #c9184a; stroke-width: 2px; }
+      .ret-line { stroke: #c5a059; stroke-width: 2px; stroke-dasharray: 4,4; }
+      .msg-txt { font-size: 11px; font-weight: 600; fill: #1b2820; }
+      .err-txt { font-size: 11px; font-weight: bold; fill: #a4161a; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: bold; fill: #112d21; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d6a4f"/>
+    </marker>
+    <marker id="err-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c9184a"/>
+    </marker>
+    <marker id="ret-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c5a059"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="40" class="title-text">Sequence 3: Payment Failure &amp; Compensation Rollback Flow</text>
+
+  <!-- Lifeline Headers -->
+  <g transform="translate(60, 70)">
+    <rect width="130" height="40" class="obj-box"/>
+    <text x="65" y="25" class="obj-txt">Guest (Browser)</text>
+    <line x1="65" y1="40" x2="65" y2="480" class="lifeline"/>
+  </g>
+
+  <g transform="translate(330, 70)">
+    <rect width="150" height="40" class="obj-box"/>
+    <text x="75" y="25" class="obj-txt">PaymentController</text>
+    <line x1="75" y1="40" x2="75" y2="480" class="lifeline"/>
+  </g>
+
+  <g transform="translate(580, 70)">
+    <rect width="160" height="40" class="obj-box"/>
+    <text x="80" y="25" class="obj-txt">PaymentSimulator</text>
+    <line x1="80" y1="40" x2="80" y2="480" class="lifeline"/>
+  </g>
+
+  <g transform="translate(810, 70)">
+    <rect width="100" height="40" class="obj-box"/>
+    <text x="50" y="25" class="obj-txt">MySQL DB</text>
+    <line x1="50" y1="40" x2="50" y2="480" class="lifeline"/>
+  </g>
+
+  <!-- Messages -->
+  <!-- 1. Submit decline simulation -->
+  <line x1="125" y1="140" x2="405" y2="140" class="err-line" marker-end="url(#err-arrow)"/>
+  <text x="140" y="132" class="err-txt">1. POST /payment/process (sim_action='fail')</text>
+
+  <!-- 2. Forward to simulator -->
+  <line x1="405" y1="180" x2="660" y2="180" class="err-line" marker-end="url(#err-arrow)"/>
+  <text x="420" y="172" class="err-txt">2. execute_simulated_gateway_charge()</text>
+
+  <!-- 3. Decline webhook response -->
+  <line x1="660" y1="230" x2="405" y2="230" class="err-line" marker-end="url(#err-arrow)"/>
+  <text x="420" y="222" class="err-txt">3. Returns {"status": "DECLINED", "reason": "INSUFFICIENT_FUNDS"}</text>
+
+  <!-- 4. Update payments to 'failed' -->
+  <line x1="405" y1="280" x2="860" y2="280" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="420" y="272" class="msg-txt">4. INSERT INTO payments (status='failed')</text>
+
+  <!-- 5. Update bookings to 'failed' -->
+  <line x1="405" y1="330" x2="860" y2="330" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="420" y="322" class="msg-txt">5. UPDATE bookings SET status='failed'</text>
+
+  <!-- 6. Compensation: No resource allocations -->
+  <path d="M 405 370 C 445 370, 445 400, 405 400" class="err-line" marker-end="url(#err-arrow)"/>
+  <text x="450" y="390" class="err-txt">6. Compensation: Slot capacity &amp; gear NOT held</text>
+
+  <!-- 7. Return to simulator with retry message -->
+  <line x1="405" y1="440" x2="125" y2="440" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="140" y="432" class="msg-txt">7. Flash Alert: "Simulated payment declined. No resources held. Retry?"</text>
+</svg>

@@ -1,0 +1,32 @@
+{% extends 'admin/_layout.html' %}
+{% from '_macros.html' import pagination %}
+{% block title %}Security Audit Logs | SOLACE Admin{% endblock %}
+{% block admin_content %}
+<div class="admin-title">
+    <div><span class="eyebrow">Governance</span><h1>Security audit logs</h1><p>{{ total }} event(s). Rows come from application actions and from database triggers (ip = db-trigger).</p></div>
+</div>
+<form class="filter-bar mb-3 row g-2 align-items-end" method="GET">
+    <div class="col-md-5"><label class="form-label" for="action">Action</label><select class="form-select form-select-sm" id="action" name="action"><option value="">All actions</option>{% for a in actions %}<option value="{{ a }}" {% if active_action == a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+    <div class="col-md-5"><label class="form-label" for="entity">Entity</label><select class="form-select form-select-sm" id="entity" name="entity"><option value="">All entities</option>{% for e in entities %}<option value="{{ e }}" {% if active_entity == e %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></div>
+    <div class="col-md-2 d-flex gap-2"><button class="btn btn-forest btn-sm flex-grow-1">Filter</button><a href="{{ url_for('admin.audit_logs') }}" class="btn btn-ghost btn-sm">Reset</a></div>
+</form>
+<div class="table-wrap">
+    <table class="table table-lux">
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Before</th><th>After</th><th>IP</th></tr></thead>
+        <tbody>
+        {% for l in logs %}
+        <tr>
+            <td class="small text-nowrap">{{ l.created_at|date_format('%d %b %Y') }}<br><span class="text-muted">{{ l.created_at|date_format('%I:%M:%S %p') }}</span></td>
+            <td class="small">{{ l.user_name or 'System' }}<br><span class="text-muted">{{ l.user_email or '' }}</span></td>
+            <td><span class="tag tag-sea">{{ l.action_type }}</span></td>
+            <td class="small font-mono">{{ l.entity_name }}{% if l.entity_id %} #{{ l.entity_id }}{% endif %}</td>
+            <td class="small font-mono text-muted" style="max-width: 220px; word-break: break-word;">{{ l.old_values or '—' }}</td>
+            <td class="small font-mono" style="max-width: 260px; word-break: break-word;">{{ l.new_values or '—' }}</td>
+            <td class="small font-mono">{{ l.ip_address }}</td>
+        </tr>
+        {% else %}<tr><td colspan="7" class="text-center text-muted py-4">No audit events.</td></tr>{% endfor %}
+        </tbody>
+    </table>
+</div>
+{{ pagination(page, total, page_size, 'admin.audit_logs') }}
+{% endblock %}

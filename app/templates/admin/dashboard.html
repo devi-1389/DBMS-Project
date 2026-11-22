@@ -1,0 +1,146 @@
+{% extends 'admin/_layout.html' %}
+{% from '_macros.html' import stat, status_pill %}
+{% block title %}Resort Management Dashboard | SOLACE{% endblock %}
+{% block admin_content %}
+<div class="admin-title">
+    <div>
+        <span class="eyebrow">Operations & governance</span>
+        <h1>Resort Management Dashboard</h1>
+        <p>Every figure below is computed live from MySQL with aggregate queries and views.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ url_for('admin.experience_new') }}" class="btn btn-gold btn-sm"><i class="bi bi-plus-lg me-1"></i>New experience</a>
+        <a href="{{ url_for('admin.schedules') }}" class="btn btn-forest btn-sm"><i class="bi bi-calendar-plus me-1"></i>Generate slots</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">{{ stat('bi-cash-stack', 'Settled revenue', kpis.total_revenue|inr0, 'Refunded: ' ~ (kpis.total_refunded|inr0), 'gold') }}</div>
+    <div class="col-6 col-xl-3">{{ stat('bi-ticket-perforated', 'Confirmed bookings', kpis.confirmed_bookings, (kpis.completed_bookings ~ ' completed · ' ~ kpis.unpaid_bookings ~ ' unpaid')) }}</div>
+    <div class="col-6 col-xl-3">{{ stat('bi-graph-up-arrow', '7-day occupancy', ((kpis.occupancy_7d or 0) ~ '%'), kpis.sessions_today ~ ' open sessions today', 'sea') }}</div>
+    <div class="col-6 col-xl-3">{{ stat('bi-star', 'Average rating', (kpis.avg_guest_rating|rating if kpis.avg_guest_rating is not none else '—'), kpis.total_reviews ~ ' review(s)', 'terra') }}</div>
+    <div class="col-6 col-xl-3">{{ stat('bi-people', 'Registered guests', kpis.total_guests) }}</div>
+    <div class="col-6 col-xl-3">{{ stat('bi-compass', 'Active experiences', kpis.active_experiences, None, 'gold') }}</div>
+    <div class="col-6 col-xl-3">{{ stat('bi-person-badge', 'Staff available', kpis.staff_on_duty, None, 'sea') }}</div>
+    <div class="col-6 col-xl-3">{{ stat('bi-tools', 'Under maintenance', kpis.maintenance_count, 'Resources blocked from booking', 'terra') }}</div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-7">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Revenue by category</h5><span class="small text-muted">confirmed + completed bookings</span></div>
+            <div class="card-pad" style="height: 320px;"><canvas id="revenueChart" aria-label="Revenue by category chart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Bookings by status</h5></div>
+            <div class="card-pad" style="height: 320px;"><canvas id="statusChart" aria-label="Bookings by status chart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Capacity outlook · next 7 days</h5><a class="small" href="{{ url_for('admin.reports') }}">Occupancy report</a></div>
+            <div class="card-pad" style="height: 280px;"><canvas id="loadChart" aria-label="Capacity outlook chart"></canvas></div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Top experiences by revenue</h5></div>
+            <div class="card-pad">
+                {% for t in top_experiences %}
+                {% set max_rev = top_experiences[0].revenue or 1 %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small"><a href="{{ url_for('experience.detail', slug=t.slug) }}" class="fw-semibold text-forest text-decoration-none">{{ t.name }}</a><span>{{ t.revenue|inr0 }}</span></div>
+                    <div class="progress-lux mt-1"><span data-width="{{ (100 * t.revenue / max_rev)|round(0) }}" style="width:0"></span></div>
+                </div>
+                {% else %}<p class="text-muted small mb-0">No paid bookings yet.</p>{% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="card-lux">
+            <div class="card-head"><h5>Recent reservations <span class="small text-muted font-sans">(view v_booking_overview)</span></h5><a href="{{ url_for('admin.bookings') }}" class="small">Manage all</a></div>
+            <div class="table-responsive">
+                <table class="table table-lux">
+                    <thead><tr><th>Reference</th><th>Guest</th><th>Experience</th><th>Session</th><th>Status</th><th class="text-end">Amount</th></tr></thead>
+                    <tbody>
+                    {% for b in recent_bookings %}
+                    <tr>
+                        <td><a class="font-mono small" href="{{ url_for('payment.confirmation', booking_id=b.booking_id) }}">{{ b.booking_reference }}</a></td>
+                        <td>{{ b.guest_name }}</td>
+                        <td class="cell-title">{{ b.experience_name }}</td>
+                        <td class="small">{{ b.slot_date|date_format('%d %b') }} · {{ b.start_time|time_format }}</td>
+                        <td>{{ status_pill(b.booking_status) }}</td>
+                        <td class="text-end fw-semibold">{{ b.total_amount|inr0 }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="card-lux mb-4">
+            <div class="card-head"><h5><i class="bi bi-leaf text-forest me-1"></i>Sustainability</h5></div>
+            <div class="card-pad">
+                <div class="d-flex justify-content-between small mb-1"><span>Low-impact experiences</span><strong>{{ eco_summary.low_impact_count }} / {{ eco_summary.total }}</strong></div>
+                <div class="progress-lux mb-3"><span data-width="{{ (100 * eco_summary.low_impact_count / (eco_summary.total or 1))|round(0) }}" style="width:0"></span></div>
+                <div class="d-flex justify-content-between small mb-1"><span>Linked to local partners</span><strong>{{ eco_summary.local_partner_exp_count }} / {{ eco_summary.total }}</strong></div>
+                <div class="progress-lux mb-3"><span data-width="{{ (100 * eco_summary.local_partner_exp_count / (eco_summary.total or 1))|round(0) }}" style="width:0"></span></div>
+                <div class="d-flex justify-content-between small"><span>Average eco-impact score</span><strong>{{ eco_summary.avg_eco_score }}/100</strong></div>
+            </div>
+        </div>
+        <div class="card-lux">
+            <div class="card-head"><h5><i class="bi bi-exclamation-triangle text-gold me-1"></i>Maintenance alerts</h5><a class="small" href="{{ url_for('admin.resources') }}">Resources</a></div>
+            <div class="card-pad">
+                {% for a in alerts %}
+                <div class="small py-2 border-bottom"><strong>{{ a.name }}</strong> {{ status_pill(a.condition_status) }}{% if a.reason %}<br><span class="text-muted">{{ a.reason }}</span>{% endif %}</div>
+                {% else %}<p class="small text-muted mb-0">No open maintenance windows.</p>{% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script>
+(function () {
+    if (!window.Chart) return;
+    Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, sans-serif";
+    Chart.defaults.color = '#64716a';
+    const palette = ['#1f4a36', '#c09a5b', '#2b6f7c', '#b65f3d', '#8fa98f', '#7f612f'];
+    const cats = {{ category_analytics|map(attribute='name')|list|tojson }};
+    const revenue = {{ category_analytics|map(attribute='revenue')|map('float')|list|tojson }};
+    const bookings = {{ category_analytics|map(attribute='booking_count')|list|tojson }};
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: { labels: cats, datasets: [{ label: 'Revenue (₹)', data: revenue, backgroundColor: palette, borderRadius: 8, maxBarThickness: 46 },
+                                         { label: 'Bookings', data: bookings, type: 'line', yAxisID: 'y1', borderColor: '#0f241b', backgroundColor: '#0f241b', tension: .35, pointRadius: 4 }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
+                   scales: { y: { grid: { color: 'rgba(0,0,0,.05)' }, ticks: { callback: (v) => '₹' + Number(v).toLocaleString('en-IN') } },
+                             y1: { position: 'right', grid: { display: false }, ticks: { precision: 0 } }, x: { grid: { display: false } } } }
+    });
+    const statusRows = {{ status_counts|tojson }};
+    const statusColors = { confirmed: '#2f8a57', completed: '#2c5d8f', cancelled: '#c0392b', pending: '#c09a5b', failed: '#d37a2a' };
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: { labels: statusRows.map(r => r.booking_status), datasets: [{ data: statusRows.map(r => r.count), backgroundColor: statusRows.map(r => statusColors[r.booking_status] || '#8fa98f'), borderWidth: 2, borderColor: '#fff' }] },
+        options: { maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'bottom' } } }
+    });
+    const loadLabels = {{ upcoming_load|map(attribute='slot_date')|map('date_format', '%a %d %b')|list|tojson }};
+    const loadBooked = {{ upcoming_load|map(attribute='booked')|map('int')|list|tojson }};
+    const loadCapacity = {{ upcoming_load|map(attribute='capacity')|map('int')|list|tojson }};
+    new Chart(document.getElementById('loadChart'), {
+        type: 'bar',
+        data: { labels: loadLabels,
+                datasets: [{ label: 'Booked units', data: loadBooked, backgroundColor: '#c09a5b', borderRadius: 6, stack: 's' },
+                           { label: 'Free units', data: loadCapacity.map((c, i) => c - loadBooked[i]), backgroundColor: '#e6ede2', borderRadius: 6, stack: 's' }] },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: 'rgba(0,0,0,.05)' } } } }
+    });
+})();
+</script>
+{% endblock %}

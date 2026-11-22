@@ -1,0 +1,103 @@
+{# Shared UI components #}
+
+{% macro status_pill(status) -%}
+<span class="pill {{ status|status_class }}">{{ (status or '')|replace('_', ' ') }}</span>
+{%- endmacro %}
+
+{% macro stars(rating, size='') -%}
+{% if rating is none %}<span class="tag tag-muted">New</span>{% else %}
+<span class="rating {{ size }}" title="{{ rating|rating }} / 5">
+{%- for i in range(1, 6) -%}
+{%- if rating >= i %}<i class="bi bi-star-fill"></i>{% elif rating >= i - 0.5 %}<i class="bi bi-star-half"></i>{% else %}<i class="bi bi-star"></i>{% endif -%}
+{%- endfor -%}
+</span>{% endif %}
+{%- endmacro %}
+
+{% macro exp_image(exp, cls='') -%}
+<img src="{{ experience_image(exp) }}" alt="{{ exp.name or exp.experience_name }}" class="{{ cls }}" loading="lazy"
+     onerror="this.onerror=null;this.src='{{ fallback_image(exp.category_slug) }}';">
+{%- endmacro %}
+
+{% macro exp_card(exp, show_supplier=false) -%}
+<article class="card-lux hoverable exp-card reveal">
+    <div class="exp-card__media">
+        {{ exp_image(exp) }}
+        <div class="exp-card__badges">
+            <span class="tag tag-glass"><i class="bi bi-leaf"></i> Eco {{ exp.eco_impact_score }}</span>
+            {% if exp.open_slots is defined and exp.open_slots == 0 %}<span class="tag tag-dark">No open sessions</span>{% endif %}
+        </div>
+        <div class="exp-card__cat"><i class="bi {{ exp.category_icon or 'bi-stars' }} text-gold"></i>{{ exp.category_name }}</div>
+    </div>
+    <div class="exp-card__body">
+        <div class="d-flex justify-content-between align-items-center small">
+            <span>{{ stars(exp.avg_rating) }} {% if exp.total_reviews %}<span class="text-muted ms-1">{{ exp.avg_rating|rating }} ({{ exp.total_reviews }})</span>{% endif %}</span>
+            <span class="text-muted"><i class="bi bi-clock me-1"></i>{{ exp.duration_minutes }} min</span>
+        </div>
+        <h3 class="exp-card__title"><a href="{{ url_for('experience.detail', slug=exp.slug) }}" class="stretched-link-off">{{ exp.name }}</a></h3>
+        <p class="exp-card__desc">{{ exp.short_desc }}</p>
+        {% if show_supplier and exp.supplier_name and exp.supplier_is_local %}
+        <div class="small text-muted mb-3"><i class="bi bi-geo-alt text-gold me-1"></i>Local partner: <strong class="text-forest">{{ exp.supplier_name }}</strong></div>
+        {% endif %}
+        <div class="exp-card__foot">
+            <div class="price">{{ exp.base_price|inr0 }} <small>/ {{ 'guest' if exp.pricing_type == 'per_person' else 'private booking' }}</small></div>
+            <a href="{{ url_for('experience.detail', slug=exp.slug) }}" class="btn btn-gold btn-sm">Explore</a>
+        </div>
+    </div>
+</article>
+{%- endmacro %}
+
+{% macro empty_state(icon, title, text, action_url=None, action_label=None) -%}
+<div class="empty-state">
+    <i class="bi {{ icon }}"></i>
+    <h5>{{ title }}</h5>
+    <p class="mb-3">{{ text }}</p>
+    {% if action_url %}<a href="{{ action_url }}" class="btn btn-gold btn-sm">{{ action_label }}</a>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro pagination(page, total, page_size, endpoint) -%}
+{% set pages = ((total + page_size - 1) // page_size) if total else 1 %}
+{% if pages > 1 %}
+{% set args = request.args.to_dict() %}
+<nav class="d-flex justify-content-between align-items-center mt-3 small" aria-label="Pagination">
+    <span class="text-muted">Showing {{ (page - 1) * page_size + 1 }}–{{ [page * page_size, total]|min }} of {{ total }}</span>
+    <ul class="pagination pagination-sm mb-0">
+        {% set _ = args.update({'page': page - 1}) %}
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}"><a class="page-link" href="{{ url_for(endpoint, **args) }}">‹</a></li>
+        {% for p in range(1, pages + 1) %}
+        {% if p == 1 or p == pages or (p - page)|abs <= 2 %}
+        {% set _ = args.update({'page': p}) %}
+        <li class="page-item {% if p == page %}active{% endif %}"><a class="page-link" href="{{ url_for(endpoint, **args) }}">{{ p }}</a></li>
+        {% elif (p - page)|abs == 3 %}<li class="page-item disabled"><span class="page-link">…</span></li>{% endif %}
+        {% endfor %}
+        {% set _ = args.update({'page': page + 1}) %}
+        <li class="page-item {% if page >= pages %}disabled{% endif %}"><a class="page-link" href="{{ url_for(endpoint, **args) }}">›</a></li>
+    </ul>
+</nav>
+{% endif %}
+{%- endmacro %}
+
+{% macro stat(icon, label, value, sub=None, tone='') -%}
+<div class="stat-tile reveal">
+    <div class="stat-tile__icon {{ tone }}"><i class="bi {{ icon }}"></i></div>
+    <div class="stat-tile__label">{{ label }}</div>
+    <div class="stat-tile__value">{{ value }}</div>
+    {% if sub %}<div class="stat-tile__sub">{{ sub }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro page_header(eyebrow, title, subtitle=None, crumbs=None) -%}
+<header class="page-header">
+    <div class="container">
+        {% if crumbs %}
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            {% for label, url in crumbs %}{% if url %}<li class="breadcrumb-item"><a href="{{ url }}">{{ label }}</a></li>{% else %}<li class="breadcrumb-item active">{{ label }}</li>{% endif %}{% endfor %}
+        </ol></nav>
+        {% endif %}
+        <span class="eyebrow on-dark">{{ eyebrow }}</span>
+        <h1>{{ title }}</h1>
+        {% if subtitle %}<p>{{ subtitle }}</p>{% endif %}
+        {{ caller() if caller }}
+    </div>
+</header>
+{%- endmacro %}

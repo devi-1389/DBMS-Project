@@ -1,0 +1,107 @@
+{% extends 'admin/_layout.html' %}
+{% from '_macros.html' import status_pill, pagination %}
+{% block title %}Schedules & Slots | SOLACE Admin{% endblock %}
+{% block admin_content %}
+<div class="admin-title">
+    <div><span class="eyebrow">Scheduling</span><h1>Schedules & slots</h1><p>{{ total }} slot(s) between {{ date_from|date_format }} and {{ date_to|date_format }}.</p></div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#slotModal"><i class="bi bi-plus me-1"></i>Single slot</button>
+        <button class="btn btn-gold btn-sm" data-bs-toggle="modal" data-bs-target="#bulkModal"><i class="bi bi-calendar-plus me-1"></i>Bulk generate (stored procedure)</button>
+    </div>
+</div>
+<form class="filter-bar mb-3 row g-2 align-items-end" method="GET">
+    <div class="col-md-4"><label class="form-label" for="f_exp">Experience</label>
+        <select class="form-select form-select-sm" id="f_exp" name="experience_id"><option value="">All experiences</option>{% for e in experiences %}<option value="{{ e.experience_id }}" {% if exp_filter == e.experience_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label" for="f_from">From</label><input type="date" class="form-control form-control-sm" id="f_from" name="date_from" value="{{ date_from }}"></div>
+    <div class="col-md-2"><label class="form-label" for="f_to">To</label><input type="date" class="form-control form-control-sm" id="f_to" name="date_to" value="{{ date_to }}"></div>
+    <div class="col-md-2"><label class="form-label" for="f_status">Status</label>
+        <select class="form-select form-select-sm" id="f_status" name="status"><option value="">Any</option>{% for s in ['available', 'locked', 'cancelled', 'completed'] %}<option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s|title }}</option>{% endfor %}</select></div>
+    <div class="col-md-2 d-flex gap-2"><button class="btn btn-forest btn-sm flex-grow-1">Filter</button><a class="btn btn-ghost btn-sm" href="{{ url_for('admin.schedules') }}">Reset</a></div>
+</form>
+<div class="table-wrap">
+    <table class="table table-lux">
+        <thead><tr><th>Date</th><th>Experience</th><th>Time</th><th>Occupancy</th><th>Bookings</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+        <tbody>
+        {% for s in slots %}
+        {% set pct = (100 * s.booked_capacity / s.max_capacity)|round(0) if s.max_capacity else 0 %}
+        <tr>
+            <td class="small"><strong>{{ s.slot_date|date_format('%a %d %b') }}</strong><br><span class="text-muted font-mono">#{{ s.slot_id }}</span></td>
+            <td><div class="cell-title">{{ s.experience_name }}</div><div class="small text-muted">{{ s.category_name }}</div></td>
+            <td class="small">{{ s.start_time|time_format }} – {{ s.end_time|time_format }}</td>
+            <td style="min-width: 150px;"><div class="small mb-1">{{ s.booked_capacity }} / {{ s.max_capacity }} {{ 'guests' if s.pricing_type == 'per_person' else 'bookings' }}</div><div class="progress-lux"><span data-width="{{ pct }}" style="width:0"></span></div></td>
+            <td class="small">{{ s.booking_count }}</td>
+            <td>{{ status_pill(s.slot_status) }}</td>
+            <td class="text-end">
+                <div class="d-inline-flex gap-1">
+                    <button class="btn btn-ghost btn-icon" title="Edit" data-bs-toggle="collapse" data-bs-target="#edit{{ s.slot_id }}"><i class="bi bi-pencil"></i></button>
+                    {% if s.slot_status == 'available' %}
+                    <form method="POST" action="{{ url_for('admin.slot_status', slot_id=s.slot_id) }}">{{ csrf_field() }}<input type="hidden" name="slot_status" value="locked"><button class="btn btn-ghost btn-icon" title="Lock (stop new bookings)"><i class="bi bi-lock"></i></button></form>
+                    <form method="POST" action="{{ url_for('admin.slot_status', slot_id=s.slot_id) }}" data-confirm="Cancel this slot?">{{ csrf_field() }}<input type="hidden" name="slot_status" value="cancelled"><button class="btn btn-ghost btn-icon" title="Cancel slot"><i class="bi bi-x-circle"></i></button></form>
+                    {% elif s.slot_status in ('locked', 'cancelled') %}
+                    <form method="POST" action="{{ url_for('admin.slot_status', slot_id=s.slot_id) }}">{{ csrf_field() }}<input type="hidden" name="slot_status" value="available"><button class="btn btn-ghost btn-icon" title="Re-open"><i class="bi bi-unlock"></i></button></form>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('admin.slot_delete', slot_id=s.slot_id) }}" data-confirm="Delete slot #{{ s.slot_id }}?">{{ csrf_field() }}<button class="btn btn-danger-soft btn-icon" title="Delete"><i class="bi bi-trash"></i></button></form>
+                </div>
+            </td>
+        </tr>
+        <tr class="collapse" id="edit{{ s.slot_id }}"><td colspan="7" style="background: var(--sand-50);">
+            <form method="POST" action="{{ url_for('admin.slot_edit', slot_id=s.slot_id) }}" class="row g-2 align-items-end">
+                {{ csrf_field() }}
+                <div class="col-md-3"><label class="form-label">Start</label><input type="time" class="form-control form-control-sm" name="start_time" value="{{ s.start_time|time_input }}" required></div>
+                <div class="col-md-3"><label class="form-label">End</label><input type="time" class="form-control form-control-sm" name="end_time" value="{{ s.end_time|time_input }}" required></div>
+                <div class="col-md-3"><label class="form-label">Capacity (≥ {{ s.booked_capacity }})</label><input type="number" class="form-control form-control-sm" name="max_capacity" min="{{ [s.booked_capacity, 1]|max }}" value="{{ s.max_capacity }}" required></div>
+                <div class="col-md-3"><button class="btn btn-forest btn-sm w-100">Save slot</button></div>
+            </form>
+        </td></tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No slots in this range. Use “Bulk generate” to create a schedule.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{{ pagination(page, total, page_size, 'admin.schedules') }}
+
+<div class="modal fade" id="slotModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="{{ url_for('admin.schedules') }}" class="modal-content" style="border-radius: var(--radius-lg);">
+        {{ csrf_field() }}
+        <div class="modal-header"><h5 class="modal-title font-serif fs-3">Create a single slot</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body row g-2">
+            <div class="col-12"><label class="form-label">Experience</label><select class="form-select exp-select" name="experience_id" required>{% for e in experiences %}<option value="{{ e.experience_id }}" data-cap="{{ e.capacity_per_slot }}" {% if exp_filter == e.experience_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select></div>
+            <div class="col-6"><label class="form-label">Date</label><input type="date" class="form-control" name="slot_date" required></div>
+            <div class="col-6"><label class="form-label">Capacity</label><input type="number" class="form-control cap-input" name="max_capacity" min="1" value="10" required></div>
+            <div class="col-6"><label class="form-label">Start</label><input type="time" class="form-control" name="start_time" value="09:00" required></div>
+            <div class="col-6"><label class="form-label">End</label><input type="time" class="form-control" name="end_time" value="11:00" required></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-gold">Create slot</button></div>
+    </form>
+</div></div>
+
+<div class="modal fade" id="bulkModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered">
+    <form method="POST" action="{{ url_for('admin.schedules_generate') }}" class="modal-content" style="border-radius: var(--radius-lg);">
+        {{ csrf_field() }}
+        <div class="modal-header"><h5 class="modal-title font-serif fs-3">Bulk generate daily slots</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body row g-2">
+            <p class="small text-muted mb-1">Runs <code>CALL sp_generate_slots(...)</code>. Existing slots with the same date and start time are skipped (unique key <code>uq_slot_time</code>).</p>
+            <div class="col-12"><label class="form-label">Experience</label><select class="form-select exp-select" name="experience_id" required>{% for e in experiences %}<option value="{{ e.experience_id }}" data-cap="{{ e.capacity_per_slot }}" {% if exp_filter == e.experience_id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select></div>
+            <div class="col-6"><label class="form-label">From</label><input type="date" class="form-control" name="start_date" required></div>
+            <div class="col-6"><label class="form-label">To (max 90 days)</label><input type="date" class="form-control" name="end_date" required></div>
+            <div class="col-4"><label class="form-label">Start</label><input type="time" class="form-control" name="start_time" value="09:00" required></div>
+            <div class="col-4"><label class="form-label">End</label><input type="time" class="form-control" name="end_time" value="11:00" required></div>
+            <div class="col-4"><label class="form-label">Capacity</label><input type="number" class="form-control cap-input" name="max_capacity" min="1" value="10" required></div>
+        </div>
+        <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-gold">Generate slots</button></div>
+    </form>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.querySelectorAll('.modal').forEach((modal) => {
+    const sel = modal.querySelector('.exp-select'), cap = modal.querySelector('.cap-input');
+    if (!sel || !cap) return;
+    const sync = () => { const o = sel.selectedOptions[0]; if (o) cap.value = o.dataset.cap; };
+    sel.addEventListener('change', sync); sync();
+    const today = new Date().toISOString().slice(0, 10);
+    modal.querySelectorAll('input[type=date]').forEach((d) => { d.min = today; if (!d.value) d.value = today; });
+});
+</script>
+{% endblock %}

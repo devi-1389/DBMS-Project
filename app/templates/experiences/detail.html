@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import stars, exp_image %}
+{% block title %}{{ experience.name }} | SOLACE{% endblock %}
+{% block content %}
+<header class="page-header page-header-media">
+    <img class="ph-img" src="{{ experience_image(experience) }}" alt="{{ experience.name }}" onerror="this.onerror=null;this.src='{{ fallback_image(experience.category_slug) }}';">
+    <div class="container">
+        <nav aria-label="breadcrumb"><ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('experience.catalogue') }}">Experiences</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('experience.catalogue', category=experience.category_slug) }}">{{ experience.category_name }}</a></li>
+            <li class="breadcrumb-item active">{{ experience.name }}</li>
+        </ol></nav>
+        <div class="d-flex flex-wrap gap-2 my-2">
+            <span class="tag tag-gold"><i class="bi {{ experience.category_icon }}"></i>{{ experience.category_name }}</span>
+            <span class="tag tag-eco"><i class="bi bi-leaf"></i>Eco score {{ experience.eco_impact_score }}/100</span>
+            {% if experience.is_low_impact %}<span class="tag tag-sea">Low impact</span>{% endif %}
+        </div>
+        <h1 class="display-5" style="max-width: 900px;">{{ experience.name }}</h1>
+        <p class="lead" style="color: rgba(255,255,255,.82);">{{ experience.short_desc }}</p>
+        <div class="d-flex flex-wrap gap-4 mt-3 small" style="color: rgba(255,255,255,.85);">
+            <span>{{ stars(experience.avg_rating) }} {% if experience.total_reviews %}{{ experience.avg_rating|rating }} · {{ experience.total_reviews }} verified review{{ 's' if experience.total_reviews != 1 }}{% endif %}</span>
+            <span><i class="bi bi-clock me-1"></i>{{ experience.duration_minutes }} minutes</span>
+            <span><i class="bi bi-people me-1"></i>{{ experience.min_party_size }}–{{ experience.max_party_size }} guests</span>
+        </div>
+    </div>
+</header>
+
+<section class="section-sm">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card-lux card-pad mb-4">
+                    <h3 class="mb-3">About this experience</h3>
+                    <p style="font-size: 1rem; line-height: 1.8;">{{ experience.full_desc }}</p>
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-4"><div class="small-caps text-gold mb-1">Age guidance</div><div class="small">{{ experience.age_restrictions or 'All ages' }}</div></div>
+                        <div class="col-md-4"><div class="small-caps text-gold mb-1">Accessibility</div><div class="small">{{ experience.accessibility_info or 'Ask our concierge' }}</div></div>
+                        <div class="col-md-4"><div class="small-caps text-gold mb-1">Safety</div><div class="small">{{ experience.safety_instructions or 'Briefing provided on arrival' }}</div></div>
+                    </div>
+                </div>
+
+                <div class="card-lux mb-4" id="sessions">
+                    <div class="card-head"><h4><i class="bi bi-calendar3 me-2 text-gold"></i>Upcoming sessions</h4><span class="small text-muted">Live availability from <code>experience_slots</code></span></div>
+                    <div class="card-pad">
+                        {% if slots %}
+                        <div class="row g-2">
+                            {% for s in slots %}
+                            {% set full = s.available_capacity <= 0 %}
+                            <div class="col-6 col-md-4 col-xl-3">
+                                {% if current_user and current_user.role == 'guest' %}
+                                <a href="{{ url_for('booking.book_slot', slot_id=s.slot_id) }}" class="slot-btn {% if full %}disabled{% endif %}">
+                                {% else %}
+                                <div class="slot-btn">
+                                {% endif %}
+                                    <div class="slot-day">{{ s.slot_date|date_format('%a %d %b') }}</div>
+                                    <div class="slot-time">{{ s.start_time|time_format }}</div>
+                                    <div class="small {% if full %}text-danger{% else %}text-muted{% endif %}">
+                                        {% if full %}Fully booked{% else %}{{ s.available_capacity }} {{ 'spot' if experience.pricing_type == 'per_person' else 'private booking' }}{{ 's' if s.available_capacity != 1 }} left{% endif %}
+                                    </div>
+                                {% if current_user and current_user.role == 'guest' %}</a>{% else %}</div>{% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if not current_user %}
+                        <div class="alert alert-light border small mt-3 mb-0"><i class="bi bi-info-circle me-1"></i><a href="{{ url_for('auth.login', next=request.path) }}">Sign in as a guest</a> to reserve a session.</div>
+                        {% elif current_user.role != 'guest' %}
+                        <div class="alert alert-light border small mt-3 mb-0"><i class="bi bi-info-circle me-1"></i>Bookings are made from guest accounts.{% if current_user.role == 'admin' %} Manage sessions in <a href="{{ url_for('admin.schedules', experience_id=experience.experience_id) }}">Admin → Schedules</a>.{% endif %}</div>
+                        {% endif %}
+                        {% else %}
+                        <p class="text-muted mb-0"><i class="bi bi-calendar-x me-1"></i>No upcoming sessions are scheduled yet. Please check back soon.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="card-lux">
+                    <div class="card-head"><h4><i class="bi bi-chat-quote me-2 text-gold"></i>Verified reviews</h4>
+                        {% if experience.total_reviews %}<span class="small text-muted">{{ experience.avg_rating|rating }} average</span>{% endif %}</div>
+                    <div class="card-pad">
+                        {% if reviews %}
+                        <div class="row g-4 mb-3">
+                            <div class="col-md-4 text-center">
+                                <div class="font-serif" style="font-size: 3.4rem; line-height: 1; color: var(--forest-800);">{{ experience.avg_rating|rating }}</div>
+                                {{ stars(experience.avg_rating) }}
+                                <div class="small text-muted">{{ experience.total_reviews }} review{{ 's' if experience.total_reviews != 1 }}</div>
+                            </div>
+                            <div class="col-md-8 d-grid gap-1">
+                                {% for star in [5, 4, 3, 2, 1] %}
+                                {% set n = rating_breakdown.get(star, 0) %}
+                                <div class="weight-bar"><span>{{ star }} star</span><div class="progress-lux"><span data-width="{{ (100 * n / experience.total_reviews)|round(0) }}" style="width:0"></span></div><span>{{ n }}</span></div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% for r in reviews %}
+                        <div class="border-top pt-3 mt-3">
+                            <div class="d-flex justify-content-between"><strong>{{ r.review_title or 'Guest review' }}</strong>{{ stars(r.rating) }}</div>
+                            <p class="text-muted small my-2">{{ r.review_text }}</p>
+                            <div class="small"><span class="avatar d-inline-grid me-1" style="width:24px;height:24px;font-size:.65rem;">{{ r.guest_name[:1] }}</span>{{ r.guest_name }} · {{ r.created_at|date_format }}</div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted mb-0">No verified reviews yet. Reviews can only be written by guests after staff mark their session as completed.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card-lux card-pad mb-4" style="position: sticky; top: 90px;">
+                    <div class="price mb-1">{{ experience.base_price|inr0 }} <small>/ {{ 'guest' if experience.pricing_type == 'per_person' else 'private booking' }}</small></div>
+                    <p class="small text-muted">{{ 'Priced per guest.' if experience.pricing_type == 'per_person' else 'One price for your whole party (up to ' ~ experience.max_party_size ~ ' guests).' }} Free cancellation up to 12 hours before the session.</p>
+                    {% if slots and current_user and current_user.role == 'guest' %}
+                    <a href="#sessions" class="btn btn-gold w-100">Choose a session</a>
+                    {% elif not current_user %}
+                    <a href="{{ url_for('auth.login', next=request.path) }}" class="btn btn-gold w-100">Sign in to book</a>
+                    {% endif %}
+                    <div class="divider"></div>
+                    {% if experience.supplier_name %}
+                    <div class="small-caps text-gold mb-1">Partner</div>
+                    <div class="small mb-3"><strong>{{ experience.supplier_name }}</strong>{% if experience.supplier_is_local %} <span class="tag tag-eco ms-1">Local</span>{% endif %}<br><span class="text-muted">{{ experience.supplier_type }}</span></div>
+                    {% endif %}
+                    {% if resources %}
+                    <div class="small-caps text-gold mb-1">Equipment & venues</div>
+                    <ul class="list-unstyled small mb-3">
+                        {% for r in resources %}
+                        <li class="mb-1"><i class="bi bi-check2 text-forest me-1"></i>{{ r.resource_name }} <span class="text-muted">({{ r.quantity_required }} {{ r.calculation_type|replace('_', ' ') }})</span>{% if r.condition_status == 'under_maintenance' %} <span class="tag tag-muted">maintenance</span>{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if staff_requirements %}
+                    <div class="small-caps text-gold mb-1">Led by</div>
+                    <ul class="list-unstyled small mb-0">
+                        {% for s in staff_requirements %}<li><i class="bi bi-person-check text-forest me-1"></i>{{ s.quantity_required }} × {{ s.role_needed }}</li>{% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if related %}
+        <div class="mt-5">
+            <h3 class="mb-3">More in {{ experience.category_name }}</h3>
+            <div class="row g-3">
+                {% for r in related %}
+                <div class="col-md-4">
+                    <a href="{{ url_for('experience.detail', slug=r.slug) }}" class="card-lux hoverable d-flex gap-3 p-2 text-decoration-none align-items-center">
+                        <div style="width: 110px; height: 80px; border-radius: 10px; overflow: hidden; flex: 0 0 110px;">{{ exp_image(r, 'w-100 h-100 object-fit-cover') }}</div>
+                        <div><div class="font-serif fs-5 text-forest" style="line-height:1.15">{{ r.name }}</div><div class="small text-muted">{{ r.base_price|inr0 }} · {{ r.duration_minutes }} min</div></div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

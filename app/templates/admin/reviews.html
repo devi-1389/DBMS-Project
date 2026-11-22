@@ -1,0 +1,32 @@
+{% extends 'admin/_layout.html' %}
+{% from '_macros.html' import stars, stat %}
+{% block title %}Review Moderation | SOLACE Admin{% endblock %}
+{% block admin_content %}
+<div class="admin-title">
+    <div><span class="eyebrow">Community</span><h1>Review moderation</h1><p>Hidden reviews (is_approved = 0) are excluded from public ratings and the recommendation engine.</p></div>
+</div>
+<div class="row g-3 mb-4">
+    <div class="col-md-4">{{ stat('bi-chat-square-quote', 'Total reviews', summary.total or 0) }}</div>
+    <div class="col-md-4">{{ stat('bi-eye', 'Published', summary.approved or 0, None, 'sea') }}</div>
+    <div class="col-md-4">{{ stat('bi-star', 'Average rating (all)', summary.avg_rating|rating if summary.avg_rating is not none else '—', None, 'gold') }}</div>
+</div>
+<div class="d-grid gap-3">
+    {% for r in reviews %}
+    <div class="card-lux card-pad">
+        <div class="d-flex flex-wrap justify-content-between gap-2">
+            <div><a href="{{ url_for('experience.detail', slug=r.slug) }}" class="font-serif fs-4 text-forest text-decoration-none">{{ r.experience_name }}</a>
+                <div class="small text-muted">{{ r.guest_name }} · {{ r.booking_reference }} · {{ r.created_at|date_format }}</div></div>
+            <div class="text-end">{{ stars(r.rating) }}<br>{% if r.is_approved %}<span class="pill status-confirmed">Published</span>{% else %}<span class="pill status-cancelled">Hidden</span>{% endif %}</div>
+        </div>
+        <strong class="d-block mt-2">{{ r.review_title or 'Untitled' }}</strong>
+        <p class="small text-muted mb-3">{{ r.review_text }}</p>
+        <div class="d-flex gap-2">
+            <form method="POST" action="{{ url_for('admin.review_toggle', review_id=r.review_id) }}">{{ csrf_field() }}<button class="btn btn-ghost btn-sm"><i class="bi {{ 'bi-eye-slash' if r.is_approved else 'bi-eye' }} me-1"></i>{{ 'Hide' if r.is_approved else 'Publish' }}</button></form>
+            <form method="POST" action="{{ url_for('admin.review_delete', review_id=r.review_id) }}" data-confirm="Delete this review permanently?">{{ csrf_field() }}<button class="btn btn-danger-soft btn-sm"><i class="bi bi-trash me-1"></i>Delete</button></form>
+        </div>
+    </div>
+    {% else %}
+    <div class="card-lux card-pad text-center text-muted">No reviews have been submitted yet.</div>
+    {% endfor %}
+</div>
+{% endblock %}

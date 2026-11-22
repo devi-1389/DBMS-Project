@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, exp_image %}
+{% block title %}Reserve {{ slot.experience_name }} | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Step 1 of 2 · Reservation', 'Reserve your session', slot.experience_name,
+               [('Experiences', url_for('experience.catalogue')), (slot.experience_name, url_for('experience.detail', slug=slot.slug)), ('Reserve', None)]) }}
+<section class="section-sm">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-7">
+                <form method="POST" action="{{ url_for('booking.initiate_booking') }}" class="card-lux card-pad">
+                    {{ csrf_field() }}
+                    <input type="hidden" name="slot_id" value="{{ slot.slot_id }}">
+                    <h4 class="mb-3">Party details</h4>
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label" for="bookingPartySize">Number of guests</label>
+                            <input type="number" class="form-control" id="bookingPartySize" name="party_size" value="{{ default_party }}" min="{{ slot.min_party_size }}" max="{{ slot.max_party_size }}" required>
+                            <div class="form-hint">Allowed: {{ slot.min_party_size }}–{{ slot.max_party_size }} guests.</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="special_requests">Special requests (optional)</label>
+                            <textarea class="form-control" id="special_requests" name="special_requests" rows="3" maxlength="1000" placeholder="Dietary needs, celebrations, accessibility…"></textarea>
+                        </div>
+                    </div>
+                    {% if slot.safety_instructions %}
+                    <div class="alert alert-light border small mt-4 mb-0"><i class="bi bi-shield-check text-forest me-1"></i><strong>Safety:</strong> {{ slot.safety_instructions }}</div>
+                    {% endif %}
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <a href="{{ url_for('experience.detail', slug=slot.slug) }}" class="btn btn-ghost">Back</a>
+                        <button type="submit" class="btn btn-gold btn-lg">Continue to payment <i class="bi bi-arrow-right ms-1"></i></button>
+                    </div>
+                </form>
+            </div>
+            <div class="col-lg-5">
+                <div class="card-lux overflow-hidden">
+                    <div style="aspect-ratio: 16/9; overflow: hidden;">{{ exp_image(slot, 'w-100 h-100 object-fit-cover') }}</div>
+                    <div class="card-pad">
+                        <span class="tag tag-gold mb-2">{{ slot.category_name }}</span>
+                        <h4 class="mb-3">{{ slot.experience_name }}</h4>
+                        <dl class="kv">
+                            <dt>Date</dt><dd>{{ slot.slot_date|date_format('%A, %d %B %Y') }}</dd>
+                            <dt>Time</dt><dd>{{ slot.start_time|time_format }} – {{ slot.end_time|time_format }}</dd>
+                            <dt>Duration</dt><dd>{{ slot.duration_minutes }} minutes</dd>
+                            <dt>Availability</dt><dd>{{ slot.available_capacity }} {{ 'spot' if slot.pricing_type == 'per_person' else 'private booking' }}{{ 's' if slot.available_capacity != 1 }} left</dd>
+                            <dt>Price</dt><dd>{{ slot.base_price|inr }} / {{ 'guest' if slot.pricing_type == 'per_person' else 'booking' }}</dd>
+                        </dl>
+                        <div class="divider"></div>
+                        <div class="d-flex justify-content-between align-items-end">
+                            <span class="small-caps text-muted">Estimated total</span>
+                            <span class="price" id="bookingTotalPrice" data-unit-price="{{ slot.base_price }}" data-pricing-type="{{ slot.pricing_type }}">{{ slot.base_price|inr }}</span>
+                        </div>
+                        <p class="form-hint mb-0">The final amount is calculated on the server. Capacity, equipment and guide availability are re-checked under row locks before confirmation.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

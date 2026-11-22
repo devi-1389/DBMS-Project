@@ -1,0 +1,161 @@
+{% extends 'dbms/_layout.html' %}
+{% block title %}Data Flow Diagrams | SOLACE Database Explorer{% endblock %}
+{% block dbms_title %}Data Flow Diagrams{% endblock %}
+{% block dbms_subtitle %}Level 0 (context) and Level 1 (system processes). Processes map to the Flask blueprints; every data store maps to real MySQL tables.{% endblock %}
+{% block dbms_content %}
+<ul class="nav subnav mb-3" style="display: inline-flex;" role="tablist">
+    <li><a href="#lvl0" data-bs-toggle="tab" class="active" role="tab" data-level="0"><i class="bi bi-circle"></i>Level 0 · Context</a></li>
+    <li><a href="#lvl1" data-bs-toggle="tab" role="tab" data-level="1"><i class="bi bi-diagram-2"></i>Level 1 · Processes</a></li>
+</ul>
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="lvl0" role="tabpanel">
+        <div class="dfd-stage mb-2" id="dfd0"><div class="text-muted small p-3">Rendering…</div></div>
+        <p class="small text-muted">The whole system is one process (0.0). External entities exchange data with it; no data stores are shown at this level.</p>
+    </div>
+    <div class="tab-pane fade" id="lvl1" role="tabpanel">
+        <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+            <div><label class="form-label" for="procFilter">Show flows for</label>
+                <select id="procFilter" class="form-select form-select-sm" style="min-width: 280px;"><option value="">All processes (complete diagram)</option></select></div>
+            <button class="btn btn-ghost btn-sm" id="dfdExport"><i class="bi bi-download me-1"></i>Export SVG</button>
+            <span class="small text-muted">Scroll to zoom · drag to pan · pick a process to isolate its flows</span>
+        </div>
+        <div class="dfd-stage mb-2 p-0" id="dfd1" style="height: 68vh; min-height: 480px;"><div class="text-muted small p-3">Rendering…</div></div>
+    </div>
+</div>
+<div class="legend mb-4"><span><span class="domain-dot" style="background:#f3e3c3;border:1px solid #7f612f;"></span> External entity</span><span><span class="domain-dot" style="background:#1f4a36;"></span> Process</span><span><span class="domain-dot" style="background:#e1eff1;border:1px solid #2b6f7c;"></span> Data store (D#)</span><span>Arrows = labelled data flows</span></div>
+
+<div class="row g-4">
+    <div class="col-xl-5">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Data stores → MySQL tables</h5></div>
+            <div class="table-responsive"><table class="table table-lux" id="storeTable"><thead><tr><th>Store</th><th>Tables</th></tr></thead><tbody></tbody></table></div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Level 1 data flows</h5><span class="small text-muted" id="flowCount"></span></div>
+            <div class="table-responsive" style="max-height: 520px;"><table class="table table-lux" id="flowTable"><thead><tr><th>From</th><th>To</th><th>Data</th></tr></thead><tbody></tbody></table></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/mermaid/mermaid.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/svg-pan-zoom/svg-pan-zoom.min.js') }}"></script>
+<script>
+(function () {
+    const LIVE_TABLES = {{ stores|tojson }};
+    const EXT = { G: 'Guest', S: 'Staff Member', A: 'Administrator', PG: 'Payment Gateway (simulated)' };
+    const PROC = {
+        P1: '1.0 Authenticate & Manage Accounts', P2: '2.0 Manage Profile & Preferences', P3: '3.0 Browse & Search Catalogue',
+        P4: '4.0 Generate Recommendations', P5: '5.0 Plan Itinerary', P6: '6.0 Book & Pay', P7: '7.0 Cancel & Refund',
+        P8: '8.0 Review & Rate', P9: '9.0 Manage Catalogue, Schedules & Resources', P10: '10.0 Deliver Sessions & Report Issues', P11: '11.0 Report & Audit'
+    };
+    const STORE = {
+        D1: ['Users & Roles', ['users', 'roles', 'guests', 'staff']],
+        D2: ['Preferences', ['interests', 'guest_preferences']],
+        D3: ['Experience Catalogue', ['experiences', 'experience_categories', 'suppliers', 'experience_resources', 'experience_staff_requirements']],
+        D4: ['Schedules', ['experience_slots']],
+        D5: ['Resources & Maintenance', ['resources', 'resource_allocations', 'maintenance_periods']],
+        D6: ['Bookings', ['bookings', 'booking_status_history', 'staff_assignments']],
+        D7: ['Payments', ['payments']],
+        D8: ['Reviews', ['reviews']],
+        D9: ['Itineraries', ['itineraries', 'itinerary_items']],
+        D10: ['Audit Log', ['audit_logs']]
+    };
+    const FLOWS = [
+        ['G', 'P1', 'registration details, credentials'], ['S', 'P1', 'credentials'], ['A', 'P1', 'credentials'],
+        ['P1', 'D1', 'new user + guest rows, hashed password'], ['D1', 'P1', 'user record & role'], ['P1', 'G', 'session / access decision'],
+        ['G', 'P2', 'trip profile, interest weights'], ['P2', 'D1', 'profile updates'], ['P2', 'D2', 'preference weights (upsert)'],
+        ['G', 'P3', 'search terms & filters'], ['D3', 'P3', 'experience details'], ['D4', 'P3', 'open sessions'], ['D8', 'P3', 'approved ratings'], ['P3', 'G', 'catalogue & availability'],
+        ['D1', 'P4', 'budget, party, dates'], ['D2', 'P4', 'interest weights'], ['D3', 'P4', 'candidate experiences'], ['D4', 'P4', 'next eligible slot'], ['P4', 'G', 'ranked matches + reasons'],
+        ['G', 'P5', 'planned activities'], ['D4', 'P5', 'matching session'], ['P5', 'D9', 'itinerary & items'], ['D9', 'P5', 'saved plan & cost'],
+        ['G', 'P6', 'booking request, payment details'], ['D4', 'P6', 'locked slot (FOR UPDATE)'], ['P6', 'PG', 'payment request'], ['PG', 'P6', 'approval / decline'],
+        ['P6', 'D4', 'booked capacity +units'], ['P6', 'D5', 'resource allocations'], ['P6', 'D6', 'booking, status history, staff assignment'], ['P6', 'D7', 'payment transaction'], ['P6', 'G', 'confirmation voucher'],
+        ['G', 'P7', 'cancellation request'], ['D6', 'P7', 'booking & deadline'], ['P7', 'D6', 'status = cancelled, refund'], ['P7', 'D4', 'capacity released'], ['P7', 'D5', 'allocations released'], ['P7', 'D7', 'payment refunded'], ['P7', 'G', 'refund confirmation'],
+        ['G', 'P8', 'rating & review'], ['D6', 'P8', 'completed-booking check'], ['P8', 'D8', 'review row'],
+        ['A', 'P9', 'experiences, slots, inventory, staff, suppliers'], ['P9', 'D3', 'catalogue changes'], ['P9', 'D4', 'generated / edited slots'], ['P9', 'D5', 'resources & maintenance'], ['P9', 'D1', 'staff & user accounts'], ['P9', 'D10', 'audit events'],
+        ['D6', 'P10', 'assigned sessions & party details'], ['S', 'P10', 'session completion, equipment issues'], ['P10', 'D6', 'status = completed'], ['P10', 'D5', 'under_maintenance + window'], ['P10', 'S', 'duty roster'],
+        ['D6', 'P11', 'bookings'], ['D7', 'P11', 'payments'], ['D5', 'P11', 'utilisation'], ['D10', 'P11', 'audit trail'], ['P11', 'A', 'dashboards, reports, audit logs']
+    ];
+    const LEVEL0 = [
+        ['G', 'SYS', 'registration, profile & interests,<br/>searches, bookings, payments,<br/>cancellations, reviews'],
+        ['SYS', 'G', 'recommendations, availability,<br/>vouchers, itinerary, refunds'],
+        ['S', 'SYS', 'session completion,<br/>equipment issues, availability'],
+        ['SYS', 'S', 'duty roster, guest party details,<br/>allocated equipment'],
+        ['A', 'SYS', 'experiences, schedules, resources,<br/>staff, suppliers, overrides'],
+        ['SYS', 'A', 'KPI dashboards, reports,<br/>audit trail, database explorer'],
+        ['SYS', 'PG', 'payment request'], ['PG', 'SYS', 'approval / decline']
+    ];
+    const CLASSES = `
+    classDef ext fill:#f3e3c3,stroke:#7f612f,stroke-width:1.5px,color:#17221d
+    classDef proc fill:#1f4a36,stroke:#c09a5b,stroke-width:2px,color:#ffffff
+    classDef store fill:#e1eff1,stroke:#2b6f7c,stroke-width:1.5px,color:#17221d`;
+    const label = (id) => EXT[id] || PROC[id] || (STORE[id] ? `${id} | ${STORE[id][0]}` : id);
+    const node = (id) => {
+        if (EXT[id]) return `${id}["${EXT[id]}"]:::ext`;
+        if (PROC[id]) return `${id}(("${PROC[id].replace(' ', '<br/>')}")):::proc`;
+        return `${id}[["${id} | ${STORE[id][0]}"]]:::store`;
+    };
+
+    function level0() {
+        const lines = ['flowchart LR', '    SYS(("0.0<br/>SOLACE Experience<br/>Management System")):::proc'];
+        ['G', 'S', 'A', 'PG'].forEach((id) => lines.push('    ' + node(id)));
+        LEVEL0.forEach(([a, b, l]) => lines.push(`    ${a} -- "${l}" --> ${b}`));
+        return lines.join('\n') + CLASSES;
+    }
+    function level1(filter) {
+        const flows = FLOWS.filter(([a, b]) => !filter || a === filter || b === filter);
+        const ids = new Set(); flows.forEach(([a, b]) => { ids.add(a); ids.add(b); });
+        const lines = ['flowchart LR'];
+        ids.forEach((id) => lines.push('    ' + node(id)));
+        flows.forEach(([a, b, l]) => lines.push(`    ${a} -- "${l}" --> ${b}`));
+        return lines.join('\n') + CLASSES;
+    }
+
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base',
+        themeVariables: { fontFamily: 'Plus Jakarta Sans, system-ui, sans-serif', fontSize: '13px', lineColor: '#5d6b64', edgeLabelBackground: '#fbf8f2' },
+        flowchart: { curve: 'basis', nodeSpacing: 36, rankSpacing: 70, htmlLabels: true, useMaxWidth: true } });
+    let seq = 0, panZoom = null;
+    async function draw(target, text) {
+        const { svg } = await mermaid.render('dfdSvg' + (++seq), text);
+        const box = document.getElementById(target);
+        if (target === 'dfd1' && panZoom) { panZoom.destroy(); panZoom = null; }
+        box.innerHTML = svg;
+        window.__solaceDfdSvg = window.__solaceDfdSvg || {};
+        window.__solaceDfdSvg[target] = svg;  // pristine copy for export
+        if (target === 'dfd1') {
+            // Level 1 is large: make it zoomable/pannable inside a fixed-height stage
+            const svgEl = box.querySelector('svg');
+            svgEl.removeAttribute('style'); svgEl.setAttribute('width', '100%'); svgEl.setAttribute('height', '100%');
+            panZoom = svgPanZoom(svgEl, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.2, maxZoom: 10 });
+        }
+    }
+
+    // Tables below the diagrams
+    const storeBody = document.querySelector('#storeTable tbody');
+    Object.entries(STORE).forEach(([id, [name, tables]]) => {
+        storeBody.insertAdjacentHTML('beforeend', `<tr><td class="fw-semibold">${id} · ${name}</td><td class="font-mono small">${tables.map((t) =>
+            LIVE_TABLES[t] ? `<a href="{{ url_for('dbms.relational_schema') }}#t-${t}">${t}</a>` : `<span class="text-danger" title="Not found in database">${t}</span>`).join(', ')}</td></tr>`);
+    });
+    const flowBody = document.querySelector('#flowTable tbody');
+    FLOWS.forEach(([a, b, l]) => flowBody.insertAdjacentHTML('beforeend', `<tr><td class="small">${label(a)}</td><td class="small">${label(b)}</td><td class="small">${l}</td></tr>`));
+    document.getElementById('flowCount').textContent = `${FLOWS.length} flows · ${Object.keys(PROC).length} processes · ${Object.keys(STORE).length} stores`;
+
+    const sel = document.getElementById('procFilter');
+    Object.entries(PROC).forEach(([id, name]) => sel.insertAdjacentHTML('beforeend', `<option value="${id}">${name}</option>`));
+    sel.addEventListener('change', () => draw('dfd1', level1(sel.value)));
+
+    draw('dfd0', level0());
+    let l1drawn = false;
+    document.querySelector('[data-level="1"]').addEventListener('shown.bs.tab', () => { if (!l1drawn) { l1drawn = true; draw('dfd1', level1('')); } });
+    if (location.hash === '#level1') { bootstrap.Tab.getOrCreateInstance(document.querySelector('[data-level="1"]')).show(); }
+
+    document.getElementById('dfdExport').addEventListener('click', () => {
+        const svg = (window.__solaceDfdSvg || {}).dfd1; if (!svg) return;
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'solace_dfd_level1.svg'; a.click();
+    });
+})();
+</script>
+{% endblock %}

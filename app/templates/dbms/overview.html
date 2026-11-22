@@ -1,0 +1,64 @@
+{% extends 'dbms/_layout.html' %}
+{% from '_macros.html' import stat %}
+{% block title %}Database Explorer | SOLACE{% endblock %}
+{% block dbms_subtitle %}Every number on this page is read from MySQL's data dictionary (information_schema) at request time - schema database <code style="color: var(--gold-300);">{{ config.DB_NAME }}</code> on MySQL {{ summary.server_version }}.{% endblock %}
+{% block dbms_content %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3 col-xl">{{ stat('bi-table', 'Base tables', summary.tables, (summary.columns ~ ' columns'), 'gold') }}</div>
+    <div class="col-6 col-md-3 col-xl">{{ stat('bi-link-45deg', 'Foreign keys', summary.foreign_keys, 'Referential integrity', 'sea') }}</div>
+    <div class="col-6 col-md-3 col-xl">{{ stat('bi-check2-square', 'CHECK constraints', check_count, (summary.indexes ~ ' indexes')) }}</div>
+    <div class="col-6 col-md-3 col-xl">{{ stat('bi-eye', 'Views', summary.views, None, 'terra') }}</div>
+    <div class="col-6 col-md-3 col-xl">{{ stat('bi-gear', 'Routines', summary.procedures + summary.functions, (summary.procedures ~ ' procedures · ' ~ summary.functions ~ ' functions'), 'gold') }}</div>
+    <div class="col-6 col-md-3 col-xl">{{ stat('bi-lightning-charge', 'Triggers', summary.triggers, None, 'sea') }}</div>
+</div>
+
+<div class="row g-4 mb-4">
+    {% set tiles = [
+        ('dbms.er_diagram', 'bi-diagram-3', 'ER Diagram', 'Interactive, zoomable crow\'s-foot diagram with PK/FK and cardinalities derived from the real foreign keys.'),
+        ('dbms.relational_schema', 'bi-table', 'Relational Schema', 'Every table with data types, keys, CHECK/UNIQUE constraints, indexes, views, routines and triggers.'),
+        ('dbms.dfd', 'bi-bezier2', 'Data Flow Diagrams', 'Context diagram (Level 0) and system processes with data stores (Level 1).'),
+        ('dbms.sql_lab_page', 'bi-terminal', 'SQL Query Laboratory', 'DDL, DML, DQL, joins, aggregates, GROUP BY/HAVING, subqueries, views, procedures and triggers.'),
+        ('dbms.tables', 'bi-hdd-stack', 'Table Viewer', 'Browse actual records of every table with pagination and search (administrators).') ] %}
+    {% for ep, icon, title, text in tiles %}
+    <div class="col-md-6 col-xl">
+        <a href="{{ url_for(ep) }}" class="card-lux hoverable card-pad d-block h-100 text-decoration-none reveal">
+            <div class="feature__icon mb-3"><i class="bi {{ icon }}"></i></div>
+            <h4 class="mb-1">{{ title }}</h4>
+            <p class="small text-muted mb-0">{{ text }}</p>
+        </a>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-7">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Tables by functional domain</h5><span class="small text-muted">{{ tables|length }} tables</span></div>
+            <div class="card-pad">
+                {% for domain, names in domains.items() %}
+                <div class="mb-3">
+                    <div class="small-caps text-gold mb-2">{{ domain }}</div>
+                    <div class="chip-row">
+                        {% for n in names %}
+                        <a class="chip" href="{{ url_for('dbms.relational_schema') }}#t-{{ n }}"><i class="bi bi-table"></i>{{ n }}{% if counts %} <span class="count">{{ counts[n] }}</span>{% endif %}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not counts %}<p class="small text-muted mb-0"><i class="bi bi-lock me-1"></i>Row counts and record browsing are available to administrators.</p>{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-5">
+        <div class="card-lux h-100">
+            <div class="card-head"><h5>Normalisation summary (3NF)</h5></div>
+            <div class="card-pad small">
+                <p><strong>1NF</strong> - every attribute is atomic (e.g. guest interests are rows in <code>guest_preferences</code>, not a comma list); every table has a primary key.</p>
+                <p><strong>2NF</strong> - associative tables (<code>guest_preferences</code>, <code>experience_resources</code>) use surrogate keys plus a UNIQUE composite key, and non-key attributes (weight, quantity) depend on the whole key.</p>
+                <p><strong>3NF</strong> - no transitive dependencies: category, supplier, role and guest details live in their own tables and are referenced by foreign keys; derived reporting values are exposed through views.</p>
+                <p class="mb-0"><strong>Specialisation</strong> - <code>guests</code> and <code>staff</code> are 1:1 subtypes of <code>users</code> ({{ relationships|selectattr('type', 'equalto', '1 : 1')|list|length }} one-to-one and {{ relationships|selectattr('type', 'equalto', '1 : N')|list|length }} one-to-many relationships in total).</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

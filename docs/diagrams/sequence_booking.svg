@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .lifeline { stroke: #95a792; stroke-width: 1.5px; stroke-dasharray: 4,4; }
+      .obj-box { fill: #112d21; stroke: #c5a059; stroke-width: 1.5px; rx: 6px; }
+      .obj-txt { fill: #fcfbf7; font-weight: bold; font-size: 13px; text-anchor: middle; }
+      .msg-line { stroke: #2d6a4f; stroke-width: 2px; }
+      .ret-line { stroke: #c5a059; stroke-width: 2px; stroke-dasharray: 4,4; }
+      .msg-txt { font-size: 11px; font-weight: 600; fill: #1b2820; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: bold; fill: #112d21; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d6a4f"/>
+    </marker>
+    <marker id="ret-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c5a059"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="40" class="title-text">Sequence 2: Concurrency-Safe Transactional Booking Flow</text>
+
+  <!-- Lifeline Headers -->
+  <g transform="translate(40, 70)">
+    <rect width="120" height="40" class="obj-box"/>
+    <text x="60" y="25" class="obj-txt">Guest (Browser)</text>
+    <line x1="60" y1="40" x2="60" y2="620" class="lifeline"/>
+  </g>
+
+  <g transform="translate(240, 70)">
+    <rect width="140" height="40" class="obj-box"/>
+    <text x="70" y="25" class="obj-txt">BookingController</text>
+    <line x1="70" y1="40" x2="70" y2="620" class="lifeline"/>
+  </g>
+
+  <g transform="translate(470, 70)">
+    <rect width="150" height="40" class="obj-box"/>
+    <text x="75" y="25" class="obj-txt">AvailabilityEngine</text>
+    <line x1="75" y1="40" x2="75" y2="620" class="lifeline"/>
+  </g>
+
+  <g transform="translate(700, 70)">
+    <rect width="140" height="40" class="obj-box"/>
+    <text x="70" y="25" class="obj-txt">PaymentSimulator</text>
+    <line x1="70" y1="40" x2="70" y2="620" class="lifeline"/>
+  </g>
+
+  <g transform="translate(890, 70)">
+    <rect width="90" height="40" class="obj-box"/>
+    <text x="45" y="25" class="obj-txt">MySQL</text>
+    <line x1="45" y1="40" x2="45" y2="620" class="lifeline"/>
+  </g>
+
+  <!-- Messages -->
+  <!-- 1. Initiate Booking -->
+  <line x1="100" y1="130" x2="310" y2="130" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="110" y="122" class="msg-txt">1. POST /booking/initiate (slot_id, party_size)</text>
+
+  <!-- 2. START TRANSACTION -->
+  <line x1="310" y1="170" x2="935" y2="170" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="320" y="162" class="msg-txt">2. START TRANSACTION</text>
+
+  <!-- 3. Lock slot row -->
+  <line x1="310" y1="210" x2="545" y2="210" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="320" y="202" class="msg-txt">3. check_slot_availability(slot_id, party_size)</text>
+
+  <line x1="545" y1="240" x2="935" y2="240" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="560" y="232" class="msg-txt">4. SELECT * FROM experience_slots FOR UPDATE</text>
+
+  <!-- 5. Validate Resources & Staff -->
+  <line x1="545" y1="280" x2="935" y2="280" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="560" y="272" class="msg-txt">5. Verify equipment inventory &amp; non-conflicting staff</text>
+
+  <!-- 6. Insert Pending Booking -->
+  <line x1="310" y1="320" x2="935" y2="320" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="320" y="312" class="msg-txt">6. INSERT INTO bookings (..., status='pending')</text>
+
+  <!-- 7. Redirect to Payment Simulator -->
+  <line x1="310" y1="360" x2="100" y2="360" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="110" y="352" class="msg-txt">7. 302 Redirect to /payment/&lt;booking_id&gt;</text>
+
+  <!-- 8. Submit Payment -->
+  <line x1="100" y1="400" x2="770" y2="400" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="110" y="392" class="msg-txt">8. POST /payment/process (sim_action='success')</text>
+
+  <!-- 9. Process Authorization -->
+  <line x1="770" y1="440" x2="935" y2="440" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="775" y="432" class="msg-txt">9. INSERT INTO payments (status='successful')</text>
+
+  <!-- 10. Confirm Booking & Commit Allocations -->
+  <line x1="770" y1="480" x2="935" y2="480" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="775" y="472" class="msg-txt">10. UPDATE bookings SET status='confirmed'</text>
+
+  <line x1="770" y1="520" x2="935" y2="520" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="775" y="512" class="msg-txt">11. UPDATE slots (booked_capacity) &amp; INSERT allocations</text>
+
+  <!-- 12. COMMIT -->
+  <line x1="770" y1="560" x2="935" y2="560" class="msg-line" marker-end="url(#arrow)"/>
+  <text x="775" y="552" class="msg-txt">12. COMMIT TRANSACTION</text>
+
+  <!-- 13. Voucher Confirmation -->
+  <line x1="770" y1="590" x2="100" y2="590" class="ret-line" marker-end="url(#ret-arrow)"/>
+  <text x="110" y="582" class="msg-txt">13. Render confirmation.html with printable booking voucher</text>
+</svg>

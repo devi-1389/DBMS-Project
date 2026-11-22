@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, status_pill, empty_state, exp_image %}
+{% block title %}My Bookings | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Reservations', 'My bookings', 'Vouchers, payments, cancellations and reviews for every reservation.', [('Dashboard', url_for('guest.dashboard')), ('My bookings', None)]) }}
+<section class="section-sm">
+    <div class="container">
+        <div class="chip-row mb-4">
+            <a class="chip {% if not active_filter %}active{% endif %}" href="{{ url_for('guest.my_bookings') }}">All <span class="count">{{ counts.values()|sum }}</span></a>
+            {% for s in ['confirmed', 'pending', 'completed', 'cancelled', 'failed'] %}
+            <a class="chip {% if active_filter == s %}active{% endif %}" href="{{ url_for('guest.my_bookings', status=s) }}">{{ s|title }} <span class="count">{{ counts.get(s, 0) }}</span></a>
+            {% endfor %}
+        </div>
+        {% if bookings %}
+        <div class="d-grid gap-3">
+            {% for b in bookings %}
+            <div class="card-lux overflow-hidden reveal">
+                <div class="row g-0">
+                    <div class="col-md-3 position-relative" style="min-height: 150px;">{{ exp_image(b, 'position-absolute w-100 h-100 object-fit-cover') }}</div>
+                    <div class="col-md-9 p-3 p-md-4">
+                        <div class="d-flex flex-wrap justify-content-between gap-2 mb-1">
+                            <div>
+                                <span class="small-caps text-gold">{{ b.category_name }}</span>
+                                <h4 class="mb-0"><a class="text-decoration-none text-forest" href="{{ url_for('experience.detail', slug=b.slug) }}">{{ b.experience_name }}</a></h4>
+                            </div>
+                            <div class="text-end">{{ status_pill(b.booking_status) }}<div class="font-mono small text-muted mt-1">{{ b.booking_reference }}</div></div>
+                        </div>
+                        <div class="meta-row my-2">
+                            <span><i class="bi bi-calendar3 me-1"></i>{{ b.slot_date|date_format('%a %d %b %Y') }}</span>
+                            <span><i class="bi bi-clock me-1"></i>{{ b.start_time|time_format }} – {{ b.end_time|time_format }}</span>
+                            <span><i class="bi bi-people me-1"></i>{{ b.party_size }} guest{{ 's' if b.party_size != 1 }}</span>
+                            <span><i class="bi bi-cash-coin me-1"></i>{{ b.total_amount|inr }}{% if b.refund_amount and b.refund_amount > 0 %} (refunded {{ b.refund_amount|inr0 }}){% endif %}</span>
+                            {% if b.payment_status %}<span>Payment: {{ status_pill(b.payment_status) }}</span>{% endif %}
+                        </div>
+                        {% if b.booking_status == 'cancelled' and b.cancellation_reason %}<div class="small text-muted mb-2"><i class="bi bi-chat-left-text me-1"></i>{{ b.cancellation_reason }}</div>{% endif %}
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            {% if b.booking_status in ('confirmed', 'completed') %}
+                            <a href="{{ url_for('payment.confirmation', booking_id=b.booking_id) }}" class="btn btn-ghost btn-sm"><i class="bi bi-ticket-perforated me-1"></i>Voucher</a>
+                            {% endif %}
+                            {% if b.booking_status in ('pending', 'failed') and b.is_future %}
+                            <a href="{{ url_for('payment.payment_simulator', booking_id=b.booking_id) }}" class="btn btn-gold btn-sm">Complete payment</a>
+                            {% endif %}
+                            {% if b.booking_status == 'completed' %}
+                                {% if b.review_id %}
+                                <a href="{{ url_for('review.edit_review', review_id=b.review_id) }}" class="btn btn-ghost btn-sm"><i class="bi bi-star-fill text-gold me-1"></i>Your review ({{ b.rating }}★)</a>
+                                {% else %}
+                                <a href="{{ url_for('review.submit_review', booking_id=b.booking_id) }}" class="btn btn-forest btn-sm"><i class="bi bi-star me-1"></i>Write a review</a>
+                                {% endif %}
+                            {% endif %}
+                            {% if b.booking_status == 'confirmed' %}
+                                {% if b.can_cancel_free %}
+                                <button type="button" class="btn btn-danger-soft btn-sm" data-bs-toggle="modal" data-bs-target="#cancel{{ b.booking_id }}">Cancel booking</button>
+                                {% else %}
+                                <span class="small text-muted align-self-center"><i class="bi bi-lock me-1"></i>Free cancellation closed {{ b.cancellation_deadline|date_format('%d %b, %I:%M %p') }}</span>
+                                {% endif %}
+                            {% elif b.booking_status in ('pending', 'failed') %}
+                            <form method="POST" action="{{ url_for('booking.cancel_booking', booking_id=b.booking_id) }}" data-confirm="Close this unpaid reservation?">
+                                {{ csrf_field() }}<input type="hidden" name="cancellation_reason" value="Guest closed unpaid reservation">
+                                <button class="btn btn-ghost btn-sm">Close reservation</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% if b.booking_status == 'confirmed' and b.can_cancel_free %}
+            <div class="modal fade" id="cancel{{ b.booking_id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <form method="POST" action="{{ url_for('booking.cancel_booking', booking_id=b.booking_id) }}" class="modal-content" style="border-radius: var(--radius-lg);">
+                        {{ csrf_field() }}
+                        <div class="modal-header"><h5 class="modal-title font-serif fs-3">Cancel {{ b.booking_reference }}?</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                        <div class="modal-body">
+                            <p class="small">You will receive a full refund of <strong>{{ b.total_amount|inr }}</strong>. Seats, equipment and guides are released immediately.</p>
+                            <label class="form-label" for="reason{{ b.booking_id }}">Reason (optional)</label>
+                            <textarea class="form-control" id="reason{{ b.booking_id }}" name="cancellation_reason" rows="2" maxlength="1000" placeholder="Change of plans"></textarea>
+                        </div>
+                        <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Keep booking</button><button class="btn btn-danger">Cancel & refund</button></div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-lux">{{ empty_state('bi-ticket-perforated', 'No bookings here yet', 'Browse the catalogue or your personalised matches to reserve your first experience.', url_for('experience.catalogue'), 'Browse experiences') }}</div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

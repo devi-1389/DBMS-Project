@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1000" width="100%" height="100%" style="background:#fcfbf7; font-family:'Plus Jakarta Sans', system-ui, sans-serif;">
+  <defs>
+    <style>
+      .act-box { fill: #ffffff; stroke: #112d21; stroke-width: 1.8px; rx: 12px; filter: drop-shadow(0 3px 6px rgba(17,45,33,0.06)); }
+      .act-text { fill: #112d21; font-size: 11px; font-weight: 600; text-anchor: middle; }
+      .dec-diamond { fill: #f4f1ea; stroke: #c5a059; stroke-width: 2px; }
+      .flow-line { stroke: #2d6a4f; stroke-width: 2px; fill: none; }
+      .alt-line { stroke: #c9184a; stroke-width: 1.8px; stroke-dasharray: 4,4; fill: none; }
+      .flow-label { font-size: 10px; font-weight: bold; fill: #2d6a4f; }
+      .alt-label { font-size: 10px; font-weight: bold; fill: #a4161a; }
+      .title-text { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; font-weight: bold; fill: #112d21; }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2d6a4f"/>
+    </marker>
+    <marker id="alt-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#c9184a"/>
+    </marker>
+  </defs>
+
+  <text x="40" y="35" class="title-text">SOLACE | Unified Activity Workflow Diagram</text>
+  <text x="40" y="55" font-size="11" fill="#5e6d64">End-to-end journey from profile calibration to recommendation, transactional booking, and feedback</text>
+
+  <!-- Start Node -->
+  <circle cx="450" cy="80" r="14" fill="#112d21"/>
+
+  <!-- Step 1: Set Profile -->
+  <path d="M 450 94 L 450 120" class="flow-line" marker-end="url(#arrow)"/>
+  <g transform="translate(330, 120)">
+    <rect width="240" height="40" class="act-box"/>
+    <text x="120" y="24" class="act-text">Set Trip Dates, Party Size &amp; Budget</text>
+  </g>
+
+  <!-- Step 2: Calibrate Preferences -->
+  <path d="M 450 160 L 450 190" class="flow-line" marker-end="url(#arrow)"/>
+  <g transform="translate(330, 190)">
+    <rect width="240" height="40" class="act-box"/>
+    <text x="120" y="24" class="act-text">Calibrate 6 Interest Weights (1-5)</text>
+  </g>
+
+  <!-- Step 3: Run Recommendation Algorithm -->
+  <path d="M 450 230 L 450 260" class="flow-line" marker-end="url(#arrow)"/>
+  <g transform="translate(330, 260)">
+    <rect width="240" height="40" class="act-box"/>
+    <text x="120" y="24" class="act-text">Compute 5-Factor Weighted Score</text>
+  </g>
+
+  <!-- Decision 1: Matches Found? -->
+  <path d="M 450 300 L 450 330" class="flow-line" marker-end="url(#arrow)"/>
+  <polygon points="450,330 500,355 450,380 400,355" class="dec-diamond"/>
+  <text x="450" y="358" font-size="10" font-weight="bold" fill="#112d21" text-anchor="middle">Eligible?</text>
+
+  <!-- Alt Path 1: No match -> adjust profile -->
+  <path d="M 500 355 L 680 355 L 680 140 L 570 140" class="alt-line" marker-end="url(#alt-arrow)"/>
+  <text x="520" y="348" class="alt-label">[No: Adjust Dates/Budget]</text>
+
+  <!-- Step 4: Display Ranked Recommendations -->
+  <path d="M 450 380 L 450 420" class="flow-line" marker-end="url(#arrow)"/>
+  <text x="455" y="405" class="flow-label">[Yes]</text>
+  <g transform="translate(330, 420)">
+    <rect width="240" height="40" class="act-box"/>
+    <text x="120" y="24" class="act-text">Display Ranked Matches &amp; Reasons</text>
+  </g>
+
+  <!-- Step 5: Select Slot -->
+  <path d="M 450 460 L 450 490" class="flow-line" marker-end="url(#arrow)"/>
+  <g transform="translate(330, 490)">
+    <rect width="240" height="40" class="act-box"/>
+    <text x="120" y="24" class="act-text">Select Date &amp; Available Slot</text>
+  </g>
+
+  <!-- Decision 2: Concurrency & Equipment Check -->
+  <path d="M 450 530 L 450 560" class="flow-line" marker-end="url(#arrow)"/>
+  <polygon points="450,560 510,585 450,610 390,585" class="dec-diamond"/>
+  <text x="450" y="589" font-size="10" font-weight="bold" fill="#112d21" text-anchor="middle">Resources OK?</text>
+
+  <!-- Alt Path 2: Conflict -> choose another slot -->
+  <path d="M 510 585 L 640 585 L 640 510 L 570 510" class="alt-line" marker-end="url(#alt-arrow)"/>
+  <text x="520" y="578" class="alt-label">[No: Conflict/Full]</text>
+
+  <!-- Step 6: Payment Simulator -->
+  <path d="M 450 610 L 450 650" class="flow-line" marker-end="url(#arrow)"/>
+  <text x="455" y="635" class="flow-label">[Yes: Pending Booking]</text>
+  <g transform="translate(330, 650)">
+    <rect width="240" height="40" class="act-box"/>
+    <text x="120" y="24" class="act-text">Execute Simulated Payment</text>
+  </g>
+
+  <!-- Decision 3: Payment Authorized? -->
+  <path d="M 450 690 L 450 720" class="flow-line" marker-end="url(#arrow)"/>
+  <polygon points="450,720 500,745 450,770 400,745" class="dec-diamond"/>
+  <text x="450" y="749" font-size="10" font-weight="bold" fill="#112d21" text-anchor="middle">Approved?</text>
+
+  <!-- Alt Path 3: Payment fail -> rollback -->
+  <path d="M 400 745 L 200 745 L 200 670 L 330 670" class="alt-line" marker-end="url(#alt-arrow)"/>
+  <text x="210" y="738" class="alt-label">[No: Rollback &amp; Retry]</text>
+
+  <!-- Step 7: Atomic Confirmation & Allocations -->
+  <path d="M 450 770 L 450 810" class="flow-line" marker-end="url(#arrow)"/>
+  <text x="455" y="795" class="flow-label">[Yes: Approved]</text>
+  <g transform="translate(310, 810)">
+    <rect width="280" height="40" class="act-box"/>
+    <text x="140" y="24" class="act-text">Confirm Booking, Commit Allocations &amp; Voucher</text>
+  </g>
+
+  <!-- Step 8: Post-Experience Review -->
+  <path d="M 450 850 L 450 880" class="flow-line" marker-end="url(#arrow)"/>
+  <g transform="translate(310, 880)">
+    <rect width="280" height="40" class="act-box"/>
+    <text x="140" y="24" class="act-text">Staff Marks Completed; Guest Submits 1-5 Star Review</text>
+  </g>
+
+  <!-- End Node -->
+  <path d="M 450 920 L 450 950" class="flow-line" marker-end="url(#arrow)"/>
+  <circle cx="450" cy="962" r="14" fill="#ffffff" stroke="#112d21" stroke-width="2"/>
+  <circle cx="450" cy="962" r="9" fill="#112d21"/>
+</svg>

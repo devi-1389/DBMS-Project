@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header, stat, exp_image %}
+{% block title %}Itinerary Planner | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Multi-day planner', itinerary.title, itinerary.start_date|date_format('%d %b %Y') ~ ' – ' ~ itinerary.end_date|date_format('%d %b %Y') ~ ' · ' ~ num_days ~ ' day' ~ ('s' if num_days != 1 else '') ~ ' · status: ' ~ itinerary.status,
+               [('Dashboard', url_for('guest.dashboard')), ('Itinerary', None)]) }}
+<section class="section-sm">
+    <div class="container">
+        {% set remaining = itinerary.total_budget - itinerary.estimated_cost %}
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">{{ stat('bi-wallet2', 'Itinerary budget', itinerary.total_budget|inr0, None, 'gold') }}</div>
+            <div class="col-md-4">{{ stat('bi-calculator', 'Planned cost', itinerary.estimated_cost|inr0, (items|length) ~ ' planned activit' ~ ('y' if items|length == 1 else 'ies')) }}</div>
+            <div class="col-md-4">{{ stat('bi-piggy-bank', 'Remaining allowance', remaining|inr0, None, 'sea' if remaining >= 0 else 'terra') }}</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
+            <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i>Planning does not hold capacity. Items linked to a scheduled session can be booked directly; capacity is reserved at payment.</p>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#editItinModal"><i class="bi bi-pencil me-1"></i>Edit details</button>
+                <button type="button" class="btn btn-gold btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal" {% if not plannable_days %}disabled title="All itinerary days are in the past - edit the dates first"{% endif %}><i class="bi bi-plus-lg me-1"></i>Add activity</button>
+            </div>
+        </div>
+
+        {% if not plannable_days %}
+        <div class="card-lux card-pad mb-3" style="border-left: 4px solid var(--gold-500);">
+            <strong>All days of this itinerary are in the past.</strong>
+            <span class="small text-muted">Use <em>Edit details</em> to move the start and end dates to your upcoming stay, then add activities.</span>
+        </div>
+        {% endif %}
+        {% for day in days %}
+        <div class="card-lux mb-3 reveal" {% if day.is_past %}style="opacity: .72;"{% endif %}>
+            <div class="card-head">
+                <h4><span class="text-gold">Day {{ day.number }}</span> · {{ day.date|date_format('%A, %d %b') }}
+                    {% if day.is_today %}<span class="tag tag-gold ms-1 align-middle">Today</span>{% elif day.is_past %}<span class="tag tag-muted ms-1 align-middle">Past</span>{% endif %}</h4>
+                <span class="small text-muted">{{ day['items']|length }} / 3 time blocks planned</span>
+            </div>
+            <div class="card-pad">
+                <div class="row g-3">
+                    {% for block in time_blocks %}
+                    {% set item = (day['items']|selectattr('time_block', 'equalto', block)|first) %}
+                    <div class="col-md-4">
+                        <div class="small-caps text-muted mb-2"><i class="bi {{ 'bi-sunrise' if block == 'morning' else ('bi-sun' if block == 'afternoon' else 'bi-moon-stars') }} me-1"></i>{{ block }}</div>
+                        {% if item %}
+                        <div class="border rounded-3 overflow-hidden h-100 d-flex flex-column" style="border-color: var(--line) !important;">
+                            <div style="height: 110px; overflow: hidden;">{{ exp_image(item, 'w-100 h-100 object-fit-cover') }}</div>
+                            <div class="p-3 d-flex flex-column flex-grow-1">
+                                <a href="{{ url_for('experience.detail', slug=item.slug) }}" class="fw-semibold text-forest text-decoration-none">{{ item.experience_name }}</a>
+                                <div class="small text-muted mb-2">
+                                    {% if item.slot_id and item.slot_date %}{{ item.slot_date|date_format('%d %b') }}, {{ item.start_time|time_format }}{% else %}No session linked{% endif %} · {{ item.estimated_cost|inr0 }}
+                                </div>
+                                {% if item.notes %}<div class="small fst-italic text-muted mb-2">“{{ item.notes }}”</div>{% endif %}
+                                <div class="mt-auto d-flex gap-2">
+                                    {% if item.slot_id and item.slot_is_future and item.slot_status == 'available' and item.available_capacity > 0 %}
+                                    <a href="{{ url_for('booking.book_slot', slot_id=item.slot_id) }}" class="btn btn-gold btn-sm flex-grow-1">Book</a>
+                                    {% elif item.slot_id and item.slot_is_future and item.available_capacity is not none and item.available_capacity <= 0 %}
+                                    <a href="{{ url_for('experience.detail', slug=item.slug) }}#sessions" class="btn btn-ghost btn-sm flex-grow-1" title="This session is fully booked">Full · other session</a>
+                                    {% else %}
+                                    <a href="{{ url_for('experience.detail', slug=item.slug) }}#sessions" class="btn btn-ghost btn-sm flex-grow-1">Pick session</a>
+                                    {% endif %}
+                                    <form method="POST" action="{{ url_for('guest.itinerary_remove', item_id=item.item_id) }}" data-confirm="Remove {{ item.experience_name }} from your itinerary?">
+                                        {{ csrf_field() }}<button class="btn btn-danger-soft btn-sm" title="Remove"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% elif day.is_past %}
+                        <div class="w-100 h-100 d-grid place-items-center text-center small text-muted py-4" style="border: 1px dashed var(--line-strong); border-radius: 12px; min-height: 120px; place-items: center;">Nothing planned</div>
+                        {% else %}
+                        <button type="button" class="w-100 h-100 btn btn-ghost py-4" style="border-style: dashed; border-radius: 12px; min-height: 120px;"
+                                data-bs-toggle="modal" data-bs-target="#addItemModal" data-day="{{ day.number }}" data-block="{{ block }}">
+                            <i class="bi bi-plus-circle d-block fs-4 mb-1 text-gold"></i>Plan {{ block }}
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-labelledby="addItemLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('guest.itinerary_add') }}" class="modal-content" style="border-radius: var(--radius-lg);">
+            {{ csrf_field() }}
+            <div class="modal-header"><h5 class="modal-title font-serif fs-3" id="addItemLabel">Add an activity</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <label class="form-label" for="experience_id">Experience</label>
+                <select class="form-select mb-3" id="experience_id" name="experience_id" required>
+                    {% for exp in available_experiences %}<option value="{{ exp.experience_id }}">[{{ exp.category_name }}] {{ exp.name }} — {{ exp.base_price|inr0 }}{{ '/guest' if exp.pricing_type == 'per_person' else '' }}</option>{% endfor %}
+                </select>
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><label class="form-label" for="day_number">Day</label>
+                        <select class="form-select" id="day_number" name="day_number">{% for d in plannable_days %}<option value="{{ d.number }}">Day {{ d.number }} · {{ d.date|date_format('%a %d %b') }}</option>{% endfor %}</select></div>
+                    <div class="col-6"><label class="form-label" for="time_block">Time block</label>
+                        <select class="form-select" id="time_block" name="time_block">{% for b in time_blocks %}<option value="{{ b }}">{{ b|title }}</option>{% endfor %}</select></div>
+                </div>
+                <label class="form-label" for="slot_id">Session on that day</label>
+                <select class="form-select mb-1" id="slot_id" name="slot_id"><option value="">Loading sessions…</option></select>
+                <div class="form-hint mb-3" id="sessionHint">Choosing a session sets the time block automatically and lets you book straight from the itinerary.</div>
+                <label class="form-label" for="notes">Notes (optional)</label>
+                <input class="form-control" id="notes" name="notes" maxlength="500" placeholder="e.g. after breakfast, bring hiking boots">
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-gold">Add to itinerary</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="editItinModal" tabindex="-1" aria-labelledby="editItinLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form method="POST" action="{{ url_for('guest.itinerary_update') }}" class="modal-content" style="border-radius: var(--radius-lg);">
+            {{ csrf_field() }}
+            <div class="modal-header"><h5 class="modal-title font-serif fs-3" id="editItinLabel">Itinerary details</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <label class="form-label" for="title">Title</label>
+                <input class="form-control mb-3" id="title" name="title" maxlength="150" value="{{ itinerary.title }}" required>
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><label class="form-label" for="start_date">Start</label><input type="date" class="form-control" id="start_date" name="start_date" value="{{ itinerary.start_date }}" required></div>
+                    <div class="col-6"><label class="form-label" for="end_date">End</label><input type="date" class="form-control" id="end_date" name="end_date" value="{{ itinerary.end_date }}" required></div>
+                </div>
+                <label class="form-label" for="total_budget">Budget (₹)</label>
+                <input type="number" class="form-control" id="total_budget" name="total_budget" min="0" step="500" value="{{ itinerary.total_budget|int }}" required>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-gold">Save details</button></div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+    const modal = document.getElementById('addItemModal');
+    const expSel = document.getElementById('experience_id');
+    const daySel = document.getElementById('day_number');
+    const blockSel = document.getElementById('time_block');
+    const slotSel = document.getElementById('slot_id');
+    const hint = document.getElementById('sessionHint');
+    const esc = window.solaceEscape;
+    let wantedBlock = null, seq = 0;
+
+    async function loadSessions() {
+        const mine = ++seq;
+        slotSel.innerHTML = '<option value="">Loading sessions…</option>';
+        try {
+            const res = await fetch(`{{ url_for('guest.itinerary_sessions') }}?experience_id=${expSel.value}&day=${daySel.value}`, { headers: { 'Accept': 'application/json' } });
+            const data = await res.json();
+            if (mine !== seq) return;
+            const sessions = (data.sessions || []).filter((s) => s.bookable);
+            let html = '<option value="">No specific session (plan only)</option>';
+            html += sessions.map((s) => `<option value="${s.slot_id}" data-block="${s.time_block}">${esc(s.start)} – ${esc(s.end)} · ${esc(s.time_block)} · ${s.available} ${esc(s.unit)}${s.available === 1 ? '' : 's'} left</option>`).join('');
+            slotSel.innerHTML = html;
+            const preferred = sessions.find((s) => s.time_block === (wantedBlock || blockSel.value)) || sessions[0];
+            if (preferred) { slotSel.value = String(preferred.slot_id); blockSel.value = preferred.time_block; }
+            hint.textContent = sessions.length
+                ? `${sessions.length} session${sessions.length === 1 ? '' : 's'} with free places on this day. The time block follows the session you choose.`
+                : 'No bookable session of this experience on that day - it will be added as a plan only. Try another day or experience.';
+        } catch (e) {
+            slotSel.innerHTML = '<option value="">No specific session (plan only)</option>';
+            hint.textContent = 'Sessions could not be loaded - you can still add the activity as a plan.';
+        }
+    }
+
+    modal.addEventListener('show.bs.modal', (e) => {
+        const trigger = e.relatedTarget;
+        wantedBlock = null;
+        if (trigger && trigger.dataset.day) {
+            daySel.value = trigger.dataset.day;
+            blockSel.value = trigger.dataset.block;
+            wantedBlock = trigger.dataset.block;
+        }
+        loadSessions();
+    });
+    expSel.addEventListener('change', loadSessions);
+    daySel.addEventListener('change', loadSessions);
+    slotSel.addEventListener('change', () => {
+        const opt = slotSel.selectedOptions[0];
+        if (opt && opt.dataset.block) blockSel.value = opt.dataset.block;
+    });
+    blockSel.addEventListener('change', () => {
+        // Picking a different block clears a session that runs in another block
+        const opt = slotSel.selectedOptions[0];
+        if (opt && opt.dataset.block && opt.dataset.block !== blockSel.value) {
+            const match = [...slotSel.options].find((o) => o.dataset.block === blockSel.value);
+            slotSel.value = match ? match.value : '';
+        }
+    });
+})();
+</script>
+{% endblock %}

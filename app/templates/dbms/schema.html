@@ -1,0 +1,108 @@
+{% extends 'dbms/_layout.html' %}
+{% block title %}Relational Schema | SOLACE Database Explorer{% endblock %}
+{% block dbms_title %}Relational Schema{% endblock %}
+{% block dbms_subtitle %}{{ tables|length }} relations with attributes, data types, primary/foreign/unique keys, CHECK constraints, indexes and referential actions - read live from information_schema.{% endblock %}
+{% block dbms_content %}
+<div class="row g-4">
+    <div class="col-lg-3">
+        <div class="lab-nav card-lux card-pad">
+            <input type="search" class="form-control form-control-sm mb-2" id="tableSearch" placeholder="Filter tables or columns…" aria-label="Filter tables">
+            <div style="max-height: 60vh; overflow-y: auto;">
+                {% for t in tables %}<a href="#t-{{ t.name }}" data-nav="{{ t.name }}"><span class="font-mono small">{{ t.name }}</span><span class="small text-muted">{{ t.columns|length }}</span></a>{% endfor %}
+                <div class="divider my-2"></div>
+                <a href="#views">Views <span class="small text-muted">{{ views|length }}</span></a>
+                <a href="#routines">Procedures & functions <span class="small text-muted">{{ routines|length }}</span></a>
+                <a href="#triggers">Triggers <span class="small text-muted">{{ triggers|length }}</span></a>
+                <a href="#notation">Schema notation</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-9">
+        <div class="card-lux card-pad mb-4" id="notation">
+            <div class="small-caps text-gold mb-2">Relational schema notation</div>
+            <div class="small font-mono" style="line-height: 2;">
+                {% for t in tables %}
+                <div data-table-row="{{ t.name }}"><strong>{{ t.name }}</strong>(
+                {%- for c in t.columns -%}
+                    {%- if 'PK' in c['keys'] %}<u>{{ c.name }}</u>{% elif 'FK' in c['keys'] %}<em style="color: var(--sea);">{{ c.name }}</em>{% else %}{{ c.name }}{% endif %}{% if not loop.last %}, {% endif -%}
+                {%- endfor -%})</div>
+                {% endfor %}
+            </div>
+            <div class="legend mt-2"><span><u>underlined</u> = primary key</span><span><em style="color: var(--sea);">italic</em> = foreign key</span></div>
+        </div>
+
+        {% for t in tables %}
+        <div class="card-lux schema-card mb-4" id="t-{{ t.name }}" data-table-card="{{ t.name }}" data-search="{{ t.name }} {{ t.columns|map(attribute='name')|join(' ') }}">
+            <div class="card-head flex-wrap">
+                <div><h4 class="font-mono" style="font-family: var(--font-mono) !important; font-size: 1.1rem;">{{ t.name }}</h4><div class="small text-muted">{{ t.description }}</div></div>
+                <div class="d-flex gap-2 align-items-center"><span class="tag tag-gold">{{ t.domain }}</span><span class="tag tag-muted">{{ t.engine }}</span></div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-lux">
+                    <thead><tr><th>#</th><th>Attribute</th><th>Data type</th><th>Null</th><th>Default</th><th>Keys</th><th>References / extra</th></tr></thead>
+                    <tbody>
+                    {% for c in t.columns %}
+                    <tr>
+                        <td class="text-muted small">{{ c.position }}</td>
+                        <td class="font-mono small fw-semibold">{{ c.name }}</td>
+                        <td class="font-mono small">{{ c.column_type }}</td>
+                        <td class="small">{{ 'NULL' if c.is_nullable == 'YES' else 'NOT NULL' }}</td>
+                        <td class="font-mono small text-muted">{{ c.default_value if c.default_value is not none else '' }}</td>
+                        <td>{% for k in c['keys'] %}<span class="col-key key-{{ k|lower }} me-1">{{ k }}</span>{% endfor %}</td>
+                        <td class="small">{% if c.references %}<a class="font-mono" href="#t-{{ c.references.split('(')[0] }}">→ {{ c.references }}</a>{% endif %} <span class="text-muted">{{ c.extra }}</span></td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-pad pt-2 row g-3 small">
+                <div class="col-md-6">
+                    <div class="small-caps text-gold mb-1">Foreign keys</div>
+                    {% for f in t.foreign_keys %}<div class="font-mono">{{ f.constraint_name }}: {{ f.child_column }} → {{ f.parent_table }}({{ f.parent_column }}) <span class="text-muted">ON DELETE {{ f.on_delete }}</span></div>{% else %}<div class="text-muted">None</div>{% endfor %}
+                    {% if t.referenced_by %}<div class="small-caps text-gold mt-2 mb-1">Referenced by</div>
+                    {% for f in t.referenced_by %}<div class="font-mono"><a href="#t-{{ f.child_table }}">{{ f.child_table }}</a>.{{ f.child_column }}</div>{% endfor %}{% endif %}
+                </div>
+                <div class="col-md-6">
+                    <div class="small-caps text-gold mb-1">CHECK constraints</div>
+                    {% for ch in t.checks %}<div class="font-mono">{{ ch.constraint_name }}: <span class="text-muted">{{ ch.check_clause }}</span></div>{% else %}<div class="text-muted">None</div>{% endfor %}
+                    <div class="small-caps text-gold mt-2 mb-1">Indexes</div>
+                    {% for i in t.indexes %}<div class="font-mono">{{ i.index_name }} ({{ i.columns }}){% if not i.non_unique %} <span class="col-key key-uk">UNIQUE</span>{% endif %}</div>{% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <h3 class="mt-5" id="views">Views</h3>
+        {% for v in views %}
+        <div class="card-lux mb-3"><div class="card-head"><h5 class="font-mono" style="font-family: var(--font-mono) !important; font-size: 1rem;">{{ v.name }}</h5><span class="tag tag-muted">updatable: {{ v.is_updatable }}</span></div>
+            <div class="card-pad"><pre class="code-block" data-sql style="max-height: 260px;">{{ v.definition }}</pre></div></div>
+        {% endfor %}
+
+        <h3 class="mt-5" id="routines">Stored procedures & functions</h3>
+        {% for r in routines %}
+        <div class="card-lux mb-3"><div class="card-head"><h5 class="font-mono" style="font-family: var(--font-mono) !important; font-size: 1rem;">{{ r.name }}({% for p in params.get(r.name, []) %}{% if p.mode %}{{ p.mode }} {% endif %}{{ p.name }} {{ p.type }}{% if not loop.last %}, {% endif %}{% endfor %}){% if r.returns %} RETURNS {{ r.returns }}{% endif %}</h5>
+            <div class="d-flex gap-2"><span class="tag tag-gold">{{ r.routine_type }}</span><span class="tag tag-muted">{{ r.data_access }}</span></div></div>
+            <div class="card-pad"><pre class="code-block" data-sql style="max-height: 300px;">{{ r.definition }}</pre></div></div>
+        {% endfor %}
+
+        <h3 class="mt-5" id="triggers">Triggers</h3>
+        {% for tr in triggers %}
+        <div class="card-lux mb-3"><div class="card-head"><h5 class="font-mono" style="font-family: var(--font-mono) !important; font-size: 1rem;">{{ tr.name }}</h5><span class="tag tag-sea">{{ tr.timing }} {{ tr.event }} ON {{ tr.table_name }}</span></div>
+            <div class="card-pad"><pre class="code-block" data-sql style="max-height: 300px;">{{ tr.statement }}</pre></div></div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('tableSearch').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('[data-table-card]').forEach((card) => {
+        const match = !q || card.dataset.search.toLowerCase().includes(q);
+        card.style.display = match ? '' : 'none';
+        const nav = document.querySelector(`[data-nav="${card.dataset.tableCard}"]`); if (nav) nav.style.display = match ? '' : 'none';
+        const row = document.querySelector(`[data-table-row="${card.dataset.tableCard}"]`); if (row) row.style.display = match ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}

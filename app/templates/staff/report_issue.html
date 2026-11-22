@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import page_header %}
+{% block title %}Report Equipment Issue | SOLACE{% endblock %}
+{% block content %}
+{{ page_header('Safety & maintenance', 'Report an equipment issue', 'The resource is immediately set to under_maintenance and a maintenance_periods row is created, which blocks new bookings that need it.',
+               [('Duty roster', url_for('staff.dashboard')), ('Report issue', None)]) }}
+<section class="section-sm">
+    <div class="container" style="max-width: 720px;">
+        <form method="POST" action="{{ url_for('staff.report_issue') }}" class="card-lux card-pad">
+            {{ csrf_field() }}
+            <div class="mb-3">
+                <label class="form-label" for="resource_id">Resource</label>
+                <select class="form-select" id="resource_id" name="resource_id" required>
+                    {% for r in resources %}<option value="{{ r.resource_id }}">[{{ r.resource_type|title }}] {{ r.name }} — {{ r.condition_status|replace('_', ' ') }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="reason">What is wrong?</label>
+                <textarea class="form-control" id="reason" name="reason" rows="4" maxlength="1000" required placeholder="e.g. Hull crack on kayak #4, unsafe for water use"></textarea>
+            </div>
+            <div class="mb-4">
+                <label class="form-label" for="duration_days">Estimated downtime (days)</label>
+                <input type="number" class="form-control" id="duration_days" name="duration_days" min="1" max="30" value="2" required>
+            </div>
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('staff.dashboard') }}" class="btn btn-ghost">Cancel</a>
+                <button class="btn btn-gold"><i class="bi bi-exclamation-triangle me-1"></i>Submit report</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}
